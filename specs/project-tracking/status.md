@@ -12,7 +12,7 @@
 | **Current phase** | Phase 3 — Actions & Entity Interaction |
 | **Active branch** | — (next: `feat/phase-3-actions`) |
 | **Last completed phase** | Phase 2 — Entity Cache & Search |
-| **Last commit on main** | TBD — Phase 2 on `feat/phase-2-cache-search` |
+| **Last commit on main** | `1a48cc8` — Phase 2 merged |
 | **Blockers** | None |
 
 ---
@@ -37,7 +37,7 @@
 |-------|------|--------|--------|--------|
 | 0 | Foundation & CI/Packaging | **Done** | `feat/planning-phase` | `81a8c4e` on main |
 | 1 | Configuration & HA Client | **Done** | `feat/phase-1-config-ha-client` | `48462ac` on main |
-| 2 | Entity Cache & Search | **Done** | `feat/phase-2-cache-search` | TBD |
+| 2 | Entity Cache & Search | **Done** | `feat/phase-2-cache-search` | `1a48cc8` on main |
 | 3 | Actions & Entity Interaction | Planned | — | — |
 | 4 | Polish & Usability | Planned | — | — |
 | 5 | WebSocket Listener | Deferred | — | — |
