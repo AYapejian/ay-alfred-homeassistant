@@ -1,7 +1,7 @@
 # Project Status
 
 **Project:** ay-alfred-homeassistant
-**Last updated:** 2026-03-20
+**Last updated:** 2026-03-21
 
 ---
 
@@ -9,10 +9,10 @@
 
 | Item | Value |
 |------|-------|
-| **Current phase** | Phase 1.5 — Enhanced Search |
-| **Active branch** | — (next: `feat/phase-1.5-enhanced-search`) |
-| **Last completed phase** | Phase 2 — Entity Cache & Search |
-| **Last commit on main** | `1a48cc8` — Phase 2 merged |
+| **Current phase** | Phase 3 — Actions & Entity Interaction |
+| **Active branch** | — (next: `feat/phase-3-actions`) |
+| **Last completed phase** | Phase 1.5 — Enhanced Search |
+| **Last commit on main** | `bae99ed` — Phase 1.5 merged |
 | **Blockers** | None |
 
 ---
@@ -28,6 +28,8 @@
 | 2026-03-20 | **Alfred Workflow Environment Variables** | Standard Alfred pattern for `HA_URL`, `HA_TOKEN`, `CACHE_TTL`. No separate config file. |
 | 2026-03-20 | **All entity domains from day one** | No domain subset filtering. Index everything HA exposes. |
 | 2026-03-20 | **CI/packaging early (Phase 0)** | Every phase produces a testable `.alfredworkflow` artifact. |
+| 2026-03-21 | **No `uid` on entity items** | Prevents Alfred's built-in learning from overriding our usage-based ranking. Our fuzzy search + usage boost has full control over ordering. |
+| 2026-03-21 | **System commands via search** | System actions (cache refresh, usage clear) surface as search results with `__system__` entity_id, distinct icon, and "System" subtitle. Dispatched through `_cmd_action` → `_cmd_system_action`. |
 
 ---
 
@@ -38,10 +40,18 @@
 | 0 | Foundation & CI/Packaging | **Done** | `feat/planning-phase` | `81a8c4e` on main |
 | 1 | Configuration & HA Client | **Done** | `feat/phase-1-config-ha-client` | `48462ac` on main |
 | 2 | Entity Cache & Search | **Done** | `feat/phase-2-cache-search` | `1a48cc8` on main |
-| 1.5 | Enhanced Search | **Next** | — | — |
-| 3 | Actions & Entity Interaction | Planned | — | — |
+| 1.5 | Enhanced Search | **Done** | `feat/phase-1.5-enhanced-search` | `bae99ed` on main |
+| 3 | Actions & Entity Interaction | **Next** | — | — |
 | 4 | Polish & Usability | Planned | — | — |
 | 5 | WebSocket Listener | Deferred | — | — |
+
+---
+
+## Known Bugs
+
+| ID | Description | Phase | Status |
+|----|-------------|-------|--------|
+| BUG-001 | Usage-based auto-suggest/prioritization may not order correctly | 1.5 | Open — needs investigation. `record-usage` is not yet called from the workflow; Phase 3 will wire it into the action flow. |
 
 ---
 
@@ -54,9 +64,13 @@ Spec: `specs/spec-000-init.md`
 Alfred "ha" keyword -> Script Filter -> /usr/bin/python3 ha_workflow/cli.py search "{query}"
                                           -> Config (Alfred env vars)
                                           -> Cache check (SQLite)
-                                          -> Fuzzy search
+                                          -> Query parser (domain filter, regex, fuzzy)
+                                          -> System command matching
+                                          -> Fuzzy search + usage boost
+                                          -> Domain suggestions
                                           -> Alfred JSON output
 
 Enter  -> Run Script -> cli.py action {entity_id} {action}  -> Notification
+                        (handles __system__ dispatch + entity actions)
 Cmd    -> Script Filter -> cli.py actions {entity_id}        -> action sub-menu
 ```

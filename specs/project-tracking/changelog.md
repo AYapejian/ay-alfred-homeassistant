@@ -63,3 +63,28 @@ Chronological log of completed work, decisions, and notable events.
 - Updated integration tests for new search behavior
 
 **Verification:** 143 tests passing (4 skipped — live HA), lint/typecheck clean, `.alfredworkflow` builds (14.6 KB).
+
+---
+
+## 2026-03-21
+
+### Phase 1.5 completed and merged to main
+
+**Commit:** `bae99ed`
+**Branch:** `feat/phase-1.5-enhanced-search` -> merged to `main`
+
+**What was done:**
+- Query parser (`query_parser.py`): decomposes raw input into domain filter (`light:bedroom`), regex (`/pattern/`), or plain fuzzy search
+- Domain filtering: `get_by_domain()` and `get_domain_counts()` on EntityCache using existing SQLite index
+- Usage tracking (`usage.py`): separate SQLite DB in `data_dir` with `UsageTracker` class (record, count, clear, get stats)
+- Usage-based ranking boost: `log(freq) + exponential recency decay` integrated into `fuzzy_search()` as optional parameter
+- Regex search: `regex_search()` with case-insensitive `re.search()` against entity_id and friendly_name
+- Domain suggestions (`suggestions.py`): Tab-completable domain filter items for partial domain queries
+- System commands: `_SYSTEM_COMMANDS` registry with keyword matching, macOS system icon, "System" subtitle prefix. "History: Clear usage data" and "Cache: Refresh entities" — always shown at top, including on empty query
+- Action handler: `_cmd_action()` dispatches `__system__` entity actions, stubs entity actions for Phase 3
+- `record-usage` CLI command ready for Phase 3 integration
+- Removed `uid` from entity items to prevent Alfred learning from overriding our ranking
+
+**Verification:** 232 tests passing (4 skipped — live HA), lint/typecheck clean, `.alfredworkflow` builds (21.4 KB).
+
+**Known issue:** Usage-based auto-suggest not yet end-to-end functional — `record-usage` is not called from the workflow until Phase 3 wires it into the action flow (BUG-001).
