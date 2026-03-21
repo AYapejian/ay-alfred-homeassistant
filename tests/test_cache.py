@@ -151,6 +151,57 @@ class TestSearch:
 
 
 # ---------------------------------------------------------------------------
+# get_by_domain / get_domain_counts
+# ---------------------------------------------------------------------------
+
+
+class TestDomainMethods:
+    def test_get_by_domain_returns_matching(self) -> None:
+        cache = _mem_cache()
+        cache.refresh(SAMPLE_ENTITIES)
+        result = cache.get_by_domain("light")
+        assert len(result) == 1
+        assert result[0].entity_id == "light.living_room"
+        cache.close()
+
+    def test_get_by_domain_no_match(self) -> None:
+        cache = _mem_cache()
+        cache.refresh(SAMPLE_ENTITIES)
+        result = cache.get_by_domain("vacuum")
+        assert result == []
+        cache.close()
+
+    def test_get_by_domain_multiple(self) -> None:
+        entities = [*SAMPLE_ENTITIES, _entity("light.kitchen", "off", "Kitchen Light")]
+        cache = _mem_cache()
+        cache.refresh(entities)
+        result = cache.get_by_domain("light")
+        assert len(result) == 2
+        ids = {e.entity_id for e in result}
+        assert ids == {"light.living_room", "light.kitchen"}
+        cache.close()
+
+    def test_get_domain_counts(self) -> None:
+        cache = _mem_cache()
+        cache.refresh(SAMPLE_ENTITIES)
+        counts = cache.get_domain_counts()
+        assert counts == {"light": 1, "switch": 1, "sensor": 1}
+        cache.close()
+
+    def test_get_domain_counts_empty_cache(self) -> None:
+        cache = _mem_cache()
+        counts = cache.get_domain_counts()
+        assert counts == {}
+        cache.close()
+
+    def test_get_by_domain_empty_cache(self) -> None:
+        cache = _mem_cache()
+        result = cache.get_by_domain("light")
+        assert result == []
+        cache.close()
+
+
+# ---------------------------------------------------------------------------
 # Cache age / staleness
 # ---------------------------------------------------------------------------
 

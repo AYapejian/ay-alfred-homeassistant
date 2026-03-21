@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from typing import Any
 
 from ha_workflow.entities import Entity
@@ -9,6 +10,7 @@ from ha_workflow.search import (
     _matches_char_sequence,
     _score_field,
     fuzzy_search,
+    regex_search,
 )
 
 # ---------------------------------------------------------------------------
@@ -213,6 +215,59 @@ class TestDeviceClassScoring:
         assert "sensor.kitchen_humidity" in ids
 
 
+# ---------------------------------------------------------------------------
+# regex_search
+# ---------------------------------------------------------------------------
+
+
+class TestRegexSearch:
+    def test_basic_pattern(self) -> None:
+        results = regex_search(ENTITIES, "bed.*room")
+        ids = [e.entity_id for e in results]
+        assert "light.bedroom" in ids
+
+    def test_case_insensitive(self) -> None:
+        results = regex_search(ENTITIES, "KITCHEN")
+        ids = [e.entity_id for e in results]
+        assert "light.kitchen" in ids
+
+    def test_matches_entity_id(self) -> None:
+        results = regex_search(ENTITIES, r"light\.kit")
+        ids = [e.entity_id for e in results]
+        assert "light.kitchen" in ids
+
+    def test_matches_friendly_name(self) -> None:
+        results = regex_search(ENTITIES, "Morning")
+        ids = [e.entity_id for e in results]
+        assert "automation.morning_routine" in ids
+
+    def test_no_match(self) -> None:
+        results = regex_search(ENTITIES, "^zzzzz$")
+        assert results == []
+
+    def test_invalid_regex_raises(self) -> None:
+        import pytest
+
+        with pytest.raises(re.error):
+            regex_search(ENTITIES, "[invalid")
+
+    def test_max_results(self) -> None:
+        results = regex_search(ENTITIES, ".*", max_results=3)
+        assert len(results) == 3
+
+    def test_anchored_pattern(self) -> None:
+        results = regex_search(ENTITIES, "^light")
+        ids = [e.entity_id for e in results]
+        # Only entities whose entity_id starts with "light"
+        for eid in ids:
+            assert eid.startswith("light.")
+
+
+# ---------------------------------------------------------------------------
+# Edge cases
+# ---------------------------------------------------------------------------
+
+
 class TestEdgeCases:
     def test_single_character_query(self) -> None:
         results = fuzzy_search(ENTITIES, "k")
@@ -230,3 +285,111 @@ class TestEdgeCases:
         results = fuzzy_search(entities, "sensor")
         # Should still match on entity_id
         assert len(results) == 1
+
+
+# ---------------------------------------------------------------------------
+# Usage-based ranking boost
+# ---------------------------------------------------------------------------
+
+
+class TestUsageBoost:
+    """Tests for the usage_stats integration in fuzzy_search."""
+
+    def _usage(
+        self, entity_id: str, count: int, last_used: float
+    ) -> dict[str, Any]:
+        from ha_workflow.usage import UsageRecord
+
+        return {
+            entity_id: UsageRecord(
+                entity_id=entity_id,
+                use_count=count,
+                last_used_at=last_used,
+            )
+        }
+
+    def test_no_usage_preserves_existing_behavior(self) -> None:
+        r1 = fuzzy_search(ENTITIES, "kitchen")
+        r2 = fuzzy_search(ENTITIES, "kitchen", usage_stats=None)
+        assert [e.entity_id for e in r1] == [e.entity_id for e in r2]
+
+    def test_usage_reorders_equal_fuzzy_scores(self) -> None:
+        # bedroom and kitchen lights have similar fuzzy scores for "light"
+        from ha_workflow.usage import UsageRecord
+
+        now = 1000000.0
+        stats = {
+            "light.bedroom": UsageRecord("light.bedroom", 10, now),
+        }
+        results = fuzzy_search(ENTITIES, "light", usage_stats=stats, now=now)
+        ids = [e.entity_id for e in results]
+        # bedroom should rank above other lights due to usage boost
+        light_ids = [eid for eid in ids if eid.startswith("light.")]
+        assert light_ids[0] == "light.bedroom"
+
+    def test_frequency_increases_boost(self) -> None:
+        from ha_workflow.usage import UsageRecord
+
+        now = 1000000.0
+        stats = {
+            "light.kitchen": UsageRecord("light.kitchen", 1, now),
+            "light.bedroom": UsageRecord("light.bedroom", 100, now),
+        }
+        results = fuzzy_search(ENTITIES, "light", usage_stats=stats, now=now)
+        ids = [e.entity_id for e in results]
+        light_ids = [eid for eid in ids if eid.startswith("light.")]
+        # bedroom (100 uses) should rank above kitchen (1 use)
+        assert light_ids.index("light.bedroom") < light_ids.index("light.kitchen")
+
+    def test_recency_boost_decays(self) -> None:
+        from ha_workflow.usage import UsageRecord
+
+        now = 1000000.0
+        stats = {
+            "light.kitchen": UsageRecord("light.kitchen", 5, now),  # just used
+            "light.bedroom": UsageRecord(
+                "light.bedroom", 5, now - 7 * 86400
+            ),  # 7 days ago
+        }
+        results = fuzzy_search(ENTITIES, "light", usage_stats=stats, now=now)
+        ids = [e.entity_id for e in results]
+        light_ids = [eid for eid in ids if eid.startswith("light.")]
+        # kitchen (recent) should rank above bedroom (stale) with same count
+        assert light_ids.index("light.kitchen") < light_ids.index("light.bedroom")
+
+    def test_empty_query_with_usage_sorts_by_usage(self) -> None:
+        from ha_workflow.usage import UsageRecord
+
+        now = 1000000.0
+        stats = {
+            "vacuum.roborock": UsageRecord("vacuum.roborock", 50, now),
+            "light.bedroom": UsageRecord("light.bedroom", 20, now),
+        }
+        results = fuzzy_search(ENTITIES, "", usage_stats=stats, now=now)
+        ids = [e.entity_id for e in results]
+        # roborock (50 uses) should come before bedroom (20 uses)
+        assert ids.index("vacuum.roborock") < ids.index("light.bedroom")
+
+    def test_empty_query_no_usage_returns_all(self) -> None:
+        results = fuzzy_search(ENTITIES, "", usage_stats={}, now=1000000.0)
+        assert len(results) == len(ENTITIES)
+
+    def test_empty_query_without_usage_stats_preserves_order(self) -> None:
+        r1 = fuzzy_search(ENTITIES, "")
+        r2 = fuzzy_search(ENTITIES, "", usage_stats=None)
+        assert [e.entity_id for e in r1] == [e.entity_id for e in r2]
+
+    def test_fuzzy_score_gates_inclusion(self) -> None:
+        """Usage boost should not cause non-matching entities to appear."""
+        from ha_workflow.usage import UsageRecord
+
+        now = 1000000.0
+        stats = {
+            "vacuum.roborock": UsageRecord("vacuum.roborock", 1000, now),
+        }
+        results = fuzzy_search(
+            ENTITIES, "kitchen", usage_stats=stats, now=now
+        )
+        ids = [e.entity_id for e in results]
+        # roborock doesn't match "kitchen" regardless of usage
+        assert "vacuum.roborock" not in ids

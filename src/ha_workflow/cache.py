@@ -95,6 +95,23 @@ class EntityCache:
         )
         return [self._row_to_entity(row) for row in cur.fetchall()]
 
+    def get_by_domain(self, domain: str) -> list[Entity]:
+        """Return all cached entities in the given *domain*."""
+        cur = self._conn.execute(
+            "SELECT entity_id, domain, state, friendly_name, "
+            "attributes_json, last_changed, last_updated "
+            "FROM entities WHERE domain = ?",
+            (domain,),
+        )
+        return [self._row_to_entity(row) for row in cur.fetchall()]
+
+    def get_domain_counts(self) -> dict[str, int]:
+        """Return ``{domain: count}`` for all cached domains."""
+        cur = self._conn.execute(
+            "SELECT domain, COUNT(*) FROM entities GROUP BY domain"
+        )
+        return {row[0]: row[1] for row in cur.fetchall()}
+
     def search(self, query: str) -> list[Entity]:
         """Basic SQL LIKE search on ``entity_id`` and ``friendly_name``."""
         pattern = f"%{query}%"

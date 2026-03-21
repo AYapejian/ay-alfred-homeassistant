@@ -45,13 +45,24 @@ def _mock_cache(
     entities: list[Entity] | None = None,
     cache_age: float | None = 5.0,
     stale: bool = False,
+    domain_counts: dict[str, int] | None = None,
 ) -> MagicMock:
     """Build a mock EntityCache."""
     cache = MagicMock()
-    cache.get_all.return_value = entities if entities is not None else SAMPLE_ENTITIES
+    ents = entities if entities is not None else SAMPLE_ENTITIES
+    cache.get_all.return_value = ents
     cache.get_cache_age.return_value = cache_age
     cache.is_stale.return_value = stale
+    cache.get_domain_counts.return_value = domain_counts or {}
+    cache.get_by_domain.side_effect = lambda d: [e for e in ents if e.domain == d]
     return cache
+
+
+def _mock_tracker(usage_stats: dict[str, object] | None = None) -> MagicMock:
+    """Build a mock UsageTracker."""
+    tracker = MagicMock()
+    tracker.get_usage_stats.return_value = usage_stats or {}
+    return tracker
 
 
 # ---------------------------------------------------------------------------
@@ -144,6 +155,7 @@ class TestConfigValidate:
 
 
 class TestSearchCommand:
+    @patch("ha_workflow.cli.open_usage_tracker")
     @patch("ha_workflow.cli._maybe_refresh_background")
     @patch("ha_workflow.cli.open_cache")
     @patch("ha_workflow.cli.Config.from_env")
@@ -152,22 +164,24 @@ class TestSearchCommand:
         mock_from_env: MagicMock,
         mock_open_cache: MagicMock,
         mock_bg_refresh: MagicMock,
+        mock_open_tracker: MagicMock,
         capsys: object,
     ) -> None:
         mock_from_env.return_value = MagicMock(cache_ttl=60)
         mock_open_cache.return_value = _mock_cache()
+        mock_open_tracker.return_value = _mock_tracker()
 
         main(["search", "living"])
 
         out = capsys.readouterr().out  # type: ignore[union-attr]
         data = json.loads(out)
-        # fuzzy_search will filter; at least one item should match
         assert len(data["items"]) >= 1
         item = data["items"][0]
         assert "title" in item
         assert "variables" in item
         assert "entity_id" in item["variables"]
 
+    @patch("ha_workflow.cli.open_usage_tracker")
     @patch("ha_workflow.cli._maybe_refresh_background")
     @patch("ha_workflow.cli.open_cache")
     @patch("ha_workflow.cli.Config.from_env")
@@ -176,10 +190,12 @@ class TestSearchCommand:
         mock_from_env: MagicMock,
         mock_open_cache: MagicMock,
         mock_bg_refresh: MagicMock,
+        mock_open_tracker: MagicMock,
         capsys: object,
     ) -> None:
         mock_from_env.return_value = MagicMock(cache_ttl=60)
         mock_open_cache.return_value = _mock_cache()
+        mock_open_tracker.return_value = _mock_tracker()
 
         main(["search", "zzzznothing"])
 
@@ -188,6 +204,7 @@ class TestSearchCommand:
         assert data["items"][0]["title"] == "No matching entities"
         assert data["items"][0]["valid"] is False
 
+    @patch("ha_workflow.cli.open_usage_tracker")
     @patch("ha_workflow.cli._maybe_refresh_background")
     @patch("ha_workflow.cli.open_cache")
     @patch("ha_workflow.cli.Config.from_env")
@@ -196,17 +213,27 @@ class TestSearchCommand:
         mock_from_env: MagicMock,
         mock_open_cache: MagicMock,
         mock_bg_refresh: MagicMock,
+        mock_open_tracker: MagicMock,
         capsys: object,
     ) -> None:
         mock_from_env.return_value = MagicMock(cache_ttl=60)
         mock_open_cache.return_value = _mock_cache()
+        mock_open_tracker.return_value = _mock_tracker()
 
         main(["search"])
 
         out = capsys.readouterr().out  # type: ignore[union-attr]
         data = json.loads(out)
-        assert len(data["items"]) == 3
+        # System commands prepended + 3 entities
+        entity_items = [
+            i for i in data["items"]
+            if i.get("variables", {}).get("domain") != "__system__"
+        ]
+        assert len(entity_items) == 3
+        # System commands appear first
+        assert data["items"][0]["variables"]["domain"] == "__system__"
 
+    @patch("ha_workflow.cli.open_usage_tracker")
     @patch("ha_workflow.cli._maybe_refresh_background")
     @patch("ha_workflow.cli.open_cache")
     @patch("ha_workflow.cli.Config.from_env")
@@ -215,10 +242,12 @@ class TestSearchCommand:
         mock_from_env: MagicMock,
         mock_open_cache: MagicMock,
         mock_bg_refresh: MagicMock,
+        mock_open_tracker: MagicMock,
         capsys: object,
     ) -> None:
         mock_from_env.return_value = MagicMock(cache_ttl=60)
         mock_open_cache.return_value = _mock_cache(stale=True)
+        mock_open_tracker.return_value = _mock_tracker()
 
         main(["search", "light"])
 
@@ -227,6 +256,7 @@ class TestSearchCommand:
         assert data.get("rerun") == 1.0
         mock_bg_refresh.assert_called_once()
 
+    @patch("ha_workflow.cli.open_usage_tracker")
     @patch("ha_workflow.cli._maybe_refresh_background")
     @patch("ha_workflow.cli.open_cache")
     @patch("ha_workflow.cli.Config.from_env")
@@ -235,10 +265,12 @@ class TestSearchCommand:
         mock_from_env: MagicMock,
         mock_open_cache: MagicMock,
         mock_bg_refresh: MagicMock,
+        mock_open_tracker: MagicMock,
         capsys: object,
     ) -> None:
         mock_from_env.return_value = MagicMock(cache_ttl=60)
         mock_open_cache.return_value = _mock_cache(cache_age=None)
+        mock_open_tracker.return_value = _mock_tracker()
 
         main(["search", "light"])
 
@@ -248,6 +280,7 @@ class TestSearchCommand:
         assert data.get("rerun") == 1.0
         mock_bg_refresh.assert_called_once()
 
+    @patch("ha_workflow.cli.open_usage_tracker")
     @patch("ha_workflow.cli._maybe_refresh_background")
     @patch("ha_workflow.cli.open_cache")
     @patch("ha_workflow.cli.Config.from_env")
@@ -256,10 +289,12 @@ class TestSearchCommand:
         mock_from_env: MagicMock,
         mock_open_cache: MagicMock,
         mock_bg_refresh: MagicMock,
+        mock_open_tracker: MagicMock,
         capsys: object,
     ) -> None:
         mock_from_env.return_value = MagicMock(cache_ttl=60)
         mock_open_cache.return_value = _mock_cache()
+        mock_open_tracker.return_value = _mock_tracker()
 
         main(["search", "kitchen"])
 
@@ -411,3 +446,300 @@ class TestBackgroundRefresh:
 
         mock_popen.assert_called_once()
         assert lock.read_text() == "54321"
+
+
+# ---------------------------------------------------------------------------
+# Enhanced search (Phase 1.5)
+# ---------------------------------------------------------------------------
+
+
+class TestDomainFilterSearch:
+    @patch("ha_workflow.cli.open_usage_tracker")
+    @patch("ha_workflow.cli._maybe_refresh_background")
+    @patch("ha_workflow.cli.open_cache")
+    @patch("ha_workflow.cli.Config.from_env")
+    def test_domain_filter_returns_only_matching_domain(
+        self,
+        mock_from_env: MagicMock,
+        mock_open_cache: MagicMock,
+        mock_bg_refresh: MagicMock,
+        mock_open_tracker: MagicMock,
+        capsys: object,
+    ) -> None:
+        mock_from_env.return_value = MagicMock(cache_ttl=60)
+        mock_open_cache.return_value = _mock_cache()
+        mock_open_tracker.return_value = _mock_tracker()
+
+        main(["search", "light:"])
+
+        out = capsys.readouterr().out  # type: ignore[union-attr]
+        data = json.loads(out)
+        # Should only return light entities
+        for item in data["items"]:
+            if "variables" in item:
+                assert item["variables"]["domain"] == "light"
+
+    @patch("ha_workflow.cli.open_usage_tracker")
+    @patch("ha_workflow.cli._maybe_refresh_background")
+    @patch("ha_workflow.cli.open_cache")
+    @patch("ha_workflow.cli.Config.from_env")
+    def test_domain_filter_with_text(
+        self,
+        mock_from_env: MagicMock,
+        mock_open_cache: MagicMock,
+        mock_bg_refresh: MagicMock,
+        mock_open_tracker: MagicMock,
+        capsys: object,
+    ) -> None:
+        mock_from_env.return_value = MagicMock(cache_ttl=60)
+        mock_open_cache.return_value = _mock_cache()
+        mock_open_tracker.return_value = _mock_tracker()
+
+        main(["search", "switch:kitchen"])
+
+        out = capsys.readouterr().out  # type: ignore[union-attr]
+        data = json.loads(out)
+        assert len(data["items"]) >= 1
+        assert data["items"][0]["variables"]["entity_id"] == "switch.kitchen"
+
+
+class TestRegexSearch:
+    @patch("ha_workflow.cli.open_usage_tracker")
+    @patch("ha_workflow.cli._maybe_refresh_background")
+    @patch("ha_workflow.cli.open_cache")
+    @patch("ha_workflow.cli.Config.from_env")
+    def test_regex_search(
+        self,
+        mock_from_env: MagicMock,
+        mock_open_cache: MagicMock,
+        mock_bg_refresh: MagicMock,
+        mock_open_tracker: MagicMock,
+        capsys: object,
+    ) -> None:
+        mock_from_env.return_value = MagicMock(cache_ttl=60)
+        mock_open_cache.return_value = _mock_cache()
+        mock_open_tracker.return_value = _mock_tracker()
+
+        main(["search", "/kitchen/"])
+
+        out = capsys.readouterr().out  # type: ignore[union-attr]
+        data = json.loads(out)
+        assert len(data["items"]) >= 1
+        ids = [i.get("variables", {}).get("entity_id") for i in data["items"]]
+        assert "switch.kitchen" in ids
+
+    @patch("ha_workflow.cli.open_usage_tracker")
+    @patch("ha_workflow.cli._maybe_refresh_background")
+    @patch("ha_workflow.cli.open_cache")
+    @patch("ha_workflow.cli.Config.from_env")
+    def test_invalid_regex_shows_error(
+        self,
+        mock_from_env: MagicMock,
+        mock_open_cache: MagicMock,
+        mock_bg_refresh: MagicMock,
+        mock_open_tracker: MagicMock,
+        capsys: object,
+    ) -> None:
+        mock_from_env.return_value = MagicMock(cache_ttl=60)
+        mock_open_cache.return_value = _mock_cache()
+        mock_open_tracker.return_value = _mock_tracker()
+
+        main(["search", "/[invalid/"])
+
+        out = capsys.readouterr().out  # type: ignore[union-attr]
+        data = json.loads(out)
+        assert data["items"][0]["title"] == "Invalid regex pattern"
+        assert data["items"][0]["valid"] is False
+
+
+class TestDomainSuggestionsInSearch:
+    @patch("ha_workflow.cli.open_usage_tracker")
+    @patch("ha_workflow.cli._maybe_refresh_background")
+    @patch("ha_workflow.cli.open_cache")
+    @patch("ha_workflow.cli.Config.from_env")
+    def test_domain_suggestions_prepended(
+        self,
+        mock_from_env: MagicMock,
+        mock_open_cache: MagicMock,
+        mock_bg_refresh: MagicMock,
+        mock_open_tracker: MagicMock,
+        capsys: object,
+    ) -> None:
+        mock_from_env.return_value = MagicMock(cache_ttl=60)
+        mock_open_cache.return_value = _mock_cache(
+            domain_counts={"light": 10, "switch": 5, "sensor": 20}
+        )
+        mock_open_tracker.return_value = _mock_tracker()
+
+        # "li" should trigger a domain suggestion for "light"
+        main(["search", "li"])
+
+        out = capsys.readouterr().out  # type: ignore[union-attr]
+        data = json.loads(out)
+        # First item should be the domain suggestion
+        first = data["items"][0]
+        assert "Filter: light" in first["title"]
+        assert first["autocomplete"] == "light:"
+        assert first["valid"] is False
+
+
+class TestRecordUsage:
+    @patch("ha_workflow.cli.open_usage_tracker")
+    @patch("ha_workflow.cli.Config.from_env")
+    def test_record_usage_calls_tracker(
+        self,
+        mock_from_env: MagicMock,
+        mock_open_tracker: MagicMock,
+    ) -> None:
+        mock_from_env.return_value = MagicMock()
+        tracker = _mock_tracker()
+        mock_open_tracker.return_value = tracker
+
+        main(["record-usage", "light.kitchen"])
+
+        tracker.record_usage.assert_called_once_with("light.kitchen")
+        tracker.close.assert_called_once()
+
+    @patch("ha_workflow.cli.open_usage_tracker")
+    @patch("ha_workflow.cli.Config.from_env")
+    def test_record_usage_no_entity_is_noop(
+        self,
+        mock_from_env: MagicMock,
+        mock_open_tracker: MagicMock,
+    ) -> None:
+        mock_from_env.return_value = MagicMock()
+        tracker = _mock_tracker()
+        mock_open_tracker.return_value = tracker
+
+        main(["record-usage"])
+
+        tracker.record_usage.assert_not_called()
+
+
+class TestSystemCommandsInSearch:
+    @patch("ha_workflow.cli.open_usage_tracker")
+    @patch("ha_workflow.cli._maybe_refresh_background")
+    @patch("ha_workflow.cli.open_cache")
+    @patch("ha_workflow.cli.Config.from_env")
+    def test_clear_usage_surfaces_in_search(
+        self,
+        mock_from_env: MagicMock,
+        mock_open_cache: MagicMock,
+        mock_bg_refresh: MagicMock,
+        mock_open_tracker: MagicMock,
+        capsys: object,
+    ) -> None:
+        mock_from_env.return_value = MagicMock(cache_ttl=60)
+        mock_open_cache.return_value = _mock_cache()
+        mock_open_tracker.return_value = _mock_tracker()
+
+        main(["search", "history clear"])
+
+        out = capsys.readouterr().out  # type: ignore[union-attr]
+        data = json.loads(out)
+        # System command is always first
+        first = data["items"][0]
+        assert first["title"] == "History: Clear usage data"
+        assert first["valid"] is True
+        assert first["variables"]["action"] == "usage_clear"
+        assert first["variables"]["entity_id"] == "__system__"
+        # Distinct icon — uses macOS system icon, not the workflow icon
+        assert first["icon"]["type"] == "fileicon"
+        assert first["icon"]["path"] != "icon.png"
+        # Subtitle has "System" prefix
+        assert first["subtitle"].startswith("System")
+
+    @patch("ha_workflow.cli.open_usage_tracker")
+    @patch("ha_workflow.cli._maybe_refresh_background")
+    @patch("ha_workflow.cli.open_cache")
+    @patch("ha_workflow.cli.Config.from_env")
+    def test_refresh_cache_surfaces_in_search(
+        self,
+        mock_from_env: MagicMock,
+        mock_open_cache: MagicMock,
+        mock_bg_refresh: MagicMock,
+        mock_open_tracker: MagicMock,
+        capsys: object,
+    ) -> None:
+        mock_from_env.return_value = MagicMock(cache_ttl=60)
+        mock_open_cache.return_value = _mock_cache()
+        mock_open_tracker.return_value = _mock_tracker()
+
+        main(["search", "cache refresh"])
+
+        out = capsys.readouterr().out  # type: ignore[union-attr]
+        data = json.loads(out)
+        titles = [i["title"] for i in data["items"]]
+        assert "Cache: Refresh entities" in titles
+
+    @patch("ha_workflow.cli.open_usage_tracker")
+    @patch("ha_workflow.cli._maybe_refresh_background")
+    @patch("ha_workflow.cli.open_cache")
+    @patch("ha_workflow.cli.Config.from_env")
+    def test_no_system_commands_for_unrelated_query(
+        self,
+        mock_from_env: MagicMock,
+        mock_open_cache: MagicMock,
+        mock_bg_refresh: MagicMock,
+        mock_open_tracker: MagicMock,
+        capsys: object,
+    ) -> None:
+        mock_from_env.return_value = MagicMock(cache_ttl=60)
+        mock_open_cache.return_value = _mock_cache()
+        mock_open_tracker.return_value = _mock_tracker()
+
+        main(["search", "living"])
+
+        out = capsys.readouterr().out  # type: ignore[union-attr]
+        data = json.loads(out)
+        sys_items = [
+            i for i in data["items"]
+            if i.get("variables", {}).get("domain") == "__system__"
+        ]
+        assert sys_items == []
+
+
+class TestActionCommand:
+    @patch("ha_workflow.cli.open_usage_tracker")
+    @patch("ha_workflow.cli.Config.from_env")
+    def test_system_action_usage_clear(
+        self,
+        mock_from_env: MagicMock,
+        mock_open_tracker: MagicMock,
+        capsys: object,
+    ) -> None:
+        mock_from_env.return_value = MagicMock()
+        tracker = _mock_tracker()
+        mock_open_tracker.return_value = tracker
+
+        main(["action", "__system__", "usage_clear"])
+
+        tracker.clear.assert_called_once()
+        out = capsys.readouterr().out  # type: ignore[union-attr]
+        assert "cleared" in out.lower()
+
+    @patch("ha_workflow.cli._refresh_cache")
+    @patch("ha_workflow.cli.open_cache")
+    @patch("ha_workflow.cli.Config.from_env")
+    def test_system_action_cache_refresh(
+        self,
+        mock_from_env: MagicMock,
+        mock_open_cache: MagicMock,
+        mock_refresh: MagicMock,
+        capsys: object,
+    ) -> None:
+        mock_from_env.return_value = MagicMock()
+        cache = _mock_cache()
+        mock_open_cache.return_value = cache
+
+        main(["action", "__system__", "cache_refresh"])
+
+        mock_refresh.assert_called_once()
+        out = capsys.readouterr().out  # type: ignore[union-attr]
+        assert "refreshed" in out.lower()
+
+    def test_entity_action_still_stubs(self, capsys: object) -> None:
+        main(["action", "light.living_room", "toggle"])
+        out = capsys.readouterr().out  # type: ignore[union-attr]
+        data = json.loads(out)
+        assert "not yet implemented" in data["items"][0]["title"]

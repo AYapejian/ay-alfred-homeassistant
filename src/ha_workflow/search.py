@@ -2,9 +2,15 @@
 
 from __future__ import annotations
 
+import math
 import re
+import time
+from typing import TYPE_CHECKING, Optional
 
 from ha_workflow.entities import Entity
+
+if TYPE_CHECKING:
+    from ha_workflow.usage import UsageRecord
 
 # ---------------------------------------------------------------------------
 # Scoring tiers
@@ -24,6 +30,10 @@ _WEIGHT_FRIENDLY_NAME = 3.0
 _WEIGHT_ENTITY_ID = 2.0
 _WEIGHT_DEVICE_CLASS = 1.0
 _WEIGHT_ATTRIBUTES = 0.5
+
+# Usage boost
+_USAGE_WEIGHT = 10.0
+_RECENCY_HALF_LIFE = 86400.0  # 24 hours in seconds
 
 # ---------------------------------------------------------------------------
 # Low-level scoring helpers
@@ -113,8 +123,50 @@ def _score_entity_multi(entity: Entity, query: str) -> float:
 
 
 # ---------------------------------------------------------------------------
+# Usage boost
+# ---------------------------------------------------------------------------
+
+
+def _usage_score(
+    entity_id: str,
+    usage_stats: dict[str, UsageRecord],
+    now: float,
+) -> float:
+    """Compute a usage boost from frequency and recency."""
+    record = usage_stats.get(entity_id)
+    if record is None:
+        return 0.0
+    freq: float = math.log(record.use_count + 1)
+    age = max(now - record.last_used_at, 0.0)
+    recency = 2.0 ** (-age / _RECENCY_HALF_LIFE)
+    result: float = (0.7 * freq + 0.3 * recency) * _USAGE_WEIGHT
+    return result
+
+
+# ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
+
+
+def regex_search(
+    entities: list[Entity],
+    pattern: str,
+    *,
+    max_results: int = 50,
+) -> list[Entity]:
+    """Search *entities* by *pattern* against ``entity_id`` and ``friendly_name``.
+
+    Returns up to *max_results* matching entities in original order.
+    Raises :class:`re.error` if *pattern* is not a valid regex.
+    """
+    compiled = re.compile(pattern, re.IGNORECASE)
+    results: list[Entity] = []
+    for entity in entities:
+        if compiled.search(entity.entity_id) or compiled.search(entity.friendly_name):
+            results.append(entity)
+            if len(results) >= max_results:
+                break
+    return results
 
 
 def fuzzy_search(
@@ -122,21 +174,40 @@ def fuzzy_search(
     query: str,
     *,
     max_results: int = 50,
+    usage_stats: Optional[dict[str, UsageRecord]] = None,
+    now: Optional[float] = None,
 ) -> list[Entity]:
     """Score and rank *entities* against *query*.
 
     Returns up to *max_results* entities sorted by descending relevance.
-    Entities with a score of zero are excluded.  An empty *query* returns
-    the first *max_results* entities unfiltered.
+    Entities with a score of zero are excluded.
+
+    When *usage_stats* is provided, a usage boost is added to the fuzzy
+    score to prefer recently and frequently used entities.  An empty
+    *query* returns entities sorted by usage score (most-used first),
+    falling back to alphabetical order for entities with no usage history.
     """
     query = query.strip()
+    ts = now if now is not None else time.time()
+
     if not query:
+        if usage_stats:
+            # Sort by usage score descending, then alphabetically
+            return sorted(
+                entities,
+                key=lambda e: (
+                    -_usage_score(e.entity_id, usage_stats, ts),
+                    e.friendly_name.lower(),
+                ),
+            )[:max_results]
         return entities[:max_results]
 
     scored: list[tuple[float, int, Entity]] = []
     for idx, entity in enumerate(entities):
         s = _score_entity_multi(entity, query)
         if s > 0:
+            if usage_stats:
+                s += _usage_score(entity.entity_id, usage_stats, ts)
             scored.append((s, idx, entity))
 
     # Sort by score descending, then original order for stability
