@@ -17,9 +17,13 @@ This is **not** a Home Assistant add-on. There is no Docker container or HA supe
 
 ## Project Status
 
-**Phase:** Planning / architecture decision — no implementation stack has been chosen yet.
+**Phase:** Implementation — Phase 0 (Foundation & CI/Packaging)
 
-The implementation language and architecture must be decided before any code is written. See `specs/spec-000-init.md` for the original requirements and constraints. When the stack decision is made, update this file accordingly.
+**Stack decision:** Python, targeting 3.9+ runtime (system `/usr/bin/python3` on macOS) for zero-friction distribution. Dev tooling (ruff, mypy, pytest) runs under local Python 3.12+. See `specs/spec-000-init.md` for original requirements and the plan file for full architecture.
+
+**Action UX:** Enter = smart default action per entity domain. Cmd modifier = action sub-menu.
+**Cache:** Pull-based REST with SQLite. WebSocket listener deferred.
+**Config:** Alfred 5 Workflow Environment Variables (`HA_URL`, `HA_TOKEN`).
 
 ---
 
@@ -66,14 +70,16 @@ This project follows a GitHub Issues + PR workflow under the **AYapejian** accou
 - 2-space indentation (enforced by `.editorconfig`)
 - Quote ambiguous strings (e.g., version numbers: `"1.0"`)
 
-### Python (if chosen as implementation language)
+### Python
 
-- Python 3.12+
+- **Runtime target:** Python 3.9+ (system `/usr/bin/python3` on macOS)
+- **Dev tooling:** Python 3.12+ locally
 - `uv` for dependency management (`uv add`, `uv sync`, `uv run`)
 - Formatter: `ruff format` (line length 88)
 - Linter: `ruff check`
 - Type checker: `mypy` strict mode
 - Tests: `pytest`
+- **No 3.10+ syntax in shipped code** — no `match` statements, no `X | Y` union types, no `except*`
 
 ---
 
