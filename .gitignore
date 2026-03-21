@@ -1,0 +1,136 @@
+# =============================================================================
+# .gitignore — ay-alfred-homeassistant
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# Environment & Secrets
+# -----------------------------------------------------------------------------
+.env
+.env.local
+.env.*.local
+*.pem
+*.key
+*.p12
+*.pfx
+credentials.json
+token.json
+secrets.yaml
+secrets.yml
+
+# -----------------------------------------------------------------------------
+# macOS
+# -----------------------------------------------------------------------------
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon?
+._*
+.Spotlight-V100
+.Trashes
+.fseventsd
+.TemporaryItems
+.VolumeIcon.icns
+.com.apple.timemachine.donotpresent
+.AppleDB
+.AppleDesktop
+Network Trash Folder
+Temporary Items
+
+# -----------------------------------------------------------------------------
+# Editors — VS Code
+# -----------------------------------------------------------------------------
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+!.vscode/*.code-snippets
+.history/
+*.vsix
+
+# -----------------------------------------------------------------------------
+# Editors — JetBrains
+# -----------------------------------------------------------------------------
+.idea/
+*.iws
+*.iml
+*.ipr
+out/
+.idea_modules/
+
+# -----------------------------------------------------------------------------
+# Editors — Vim / Neovim
+# -----------------------------------------------------------------------------
+[._]*.s[a-v][a-z]
+!*.svg
+[._]*.sw[a-p]
+[._]s[a-rt-v][a-z]
+[._]ss[a-gi-z]
+[._]sw[a-p]
+Session.vim
+Stacktrace.vim
+.netrwhist
+tags
+[._]*.un~
+
+# -----------------------------------------------------------------------------
+# Python (if chosen as implementation language)
+# -----------------------------------------------------------------------------
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+.venv/
+venv/
+.Python
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+htmlcov/
+coverage.xml
+*.cover
+*.py,cover
+.hypothesis/
+pytestdebug.log
+
+# -----------------------------------------------------------------------------
+# Node / JavaScript (if chosen as implementation language)
+# -----------------------------------------------------------------------------
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+.npm
+.yarn/
+.cache/
+
+# -----------------------------------------------------------------------------
+# Alfred Workflow build artifacts
+# -----------------------------------------------------------------------------
+*.alfredworkflow
+
+# -----------------------------------------------------------------------------
+# Logs
+# -----------------------------------------------------------------------------
+*.log
+*.log.*
+logs/
+log/
+
+# -----------------------------------------------------------------------------
+# Scratch / Temporary
+# -----------------------------------------------------------------------------
+_scratchpad/
+tmp/
+temp/
+*.tmp
+*.bak
+*.swp
+*.orig
