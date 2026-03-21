@@ -1,0 +1,20 @@
+changelog:
+  categories:
+    - title: "New Features"
+      labels:
+        - feature
+    - title: "Bug Fixes"
+      labels:
+        - bug
+    - title: "Documentation"
+      labels:
+        - docs
+    - title: "Maintenance"
+      labels:
+        - chore
+    - title: "Other Changes"
+      labels:
+        - "*"
+  exclude:
+    labels:
+      - idea

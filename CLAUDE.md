@@ -97,6 +97,7 @@ Repository: `AYapejian/ay-alfred-homeassistant`
 
 - **CI:** GitHub Actions runs lint, format check, type check, tests, and build on every push to `main` and every PR. See `.github/workflows/ci.yml`.
 - **Releases:** Tag with `vX.Y.Z` to trigger the release workflow, which builds the `.alfredworkflow` and creates a GitHub Release. See `.github/workflows/release.yml`.
+- **Code Review:** Claude Code reviews PRs automatically on open/reopen. Use `@claude` in any PR comment for interactive follow-up. See `.github/REVIEW.md` for review guidelines.
 
 ---
 
