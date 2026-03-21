@@ -1,8 +1,8 @@
 # Phase 2: Entity Cache & Search
 
 **Goal:** Core user experience — type a query in Alfred, see matching HA entities.
-**Status:** Planned
-**Branch:** TBD
+**Status:** Done
+**Branch:** `feat/phase-2-cache-search`
 **Depends on:** Phase 1
 
 ---
@@ -10,47 +10,52 @@
 ## Tasks
 
 ### 2.1 — Entity data model (`src/ha_workflow/entities.py`)
-- [ ] **Pending**
-- `Entity` dataclass: `entity_id`, `domain`, `state`, `friendly_name`, `attributes` (dict), `last_updated`
-- `DomainConfig`: `default_action`, `available_actions`, `icon_name`, `subtitle_formatter`
-- `DOMAIN_REGISTRY` covering all common HA domains (light, switch, sensor, binary_sensor, automation, script, scene, climate, media_player, cover, fan, lock, vacuum, camera, weather, person, zone, input_boolean, input_number, input_select, input_text, group, timer, counter, input_datetime, number, select, button, humidifier, water_heater, siren, update, etc.)
-- **Tests:** `tests/test_entities.py`
-- **Depends on:** 0.1
+- [x] **Done** — 2026-03-20
+- `Entity` frozen dataclass: `entity_id`, `domain`, `state`, `friendly_name`, `attributes` (dict), `last_changed`, `last_updated`
+- `Entity.from_state_dict()` classmethod converts HA REST API state dicts
+- `DomainConfig`: `default_action`, `available_actions`, `icon_path`, `subtitle_formatter`
+- `DOMAIN_REGISTRY` covering 31 HA domains with domain-specific subtitle formatters (light, sensor, climate, media_player, cover, update, etc.)
+- `get_domain_config(domain)` with unknown-domain fallback
+- **Tests:** `tests/test_entities.py` — 29 tests
 
 ### 2.2 — SQLite entity cache (`src/ha_workflow/cache.py`)
-- [ ] **Pending**
-- Create/open SQLite DB in Alfred cache directory. WAL mode.
-- Methods: `refresh(entities)`, `get_all()`, `search(query)` (basic LIKE), `get_cache_age()`, `is_stale(ttl)`
-- Schema: `entities` table (entity_id PK, domain, state, friendly_name, attributes_json, last_changed, last_updated), `cache_meta` table, indexes on domain and friendly_name
-- **Tests:** `tests/test_cache.py` — in-memory SQLite
-- **Depends on:** 1.1, 2.1
+- [x] **Done** — 2026-03-20
+- `EntityCache` class: SQLite DB in Alfred cache directory, WAL mode
+- Methods: `refresh(entities)`, `get_all()`, `search(query)` (LIKE), `get_cache_age()`, `is_stale(ttl)`, `close()`
+- Schema: `entities` table (entity_id PK, domain, state, friendly_name, attributes_json, last_changed, last_updated), `cache_meta` table (key/value), indexes on domain and friendly_name
+- `open_cache(config)` factory function
+- **Tests:** `tests/test_cache.py` — 17 tests (in-memory SQLite)
 
 ### 2.3 — Fuzzy search (`src/ha_workflow/search.py`)
-- [ ] **Pending**
-- Scoring: exact > prefix > word-boundary > substring > character-sequence
-- Fields: `friendly_name` (highest weight), `entity_id` (medium), `device_class`/attributes (lower)
-- Cap at 50 results. Sorted by score.
-- **Tests:** `tests/test_search.py` — diverse match types, edge cases, scoring order
-- **Depends on:** 2.1
+- [x] **Done** — 2026-03-20
+- 5-tier scoring: exact(100) > prefix(80) > word-boundary(60) > substring(40) > char-sequence(20)
+- Field weights: friendly_name(3.0) > entity_id(2.0) > device_class(1.0) > area attrs(0.5)
+- Multi-word queries: each word must match, scores summed
+- Cap at 50 results, sorted by descending score
+- **Tests:** `tests/test_search.py` — 31 tests (scoring tiers, multi-word, edge cases)
 
 ### 2.4 — Search command end-to-end
-- [ ] **Pending**
-- Wire `search` in `cli.py`: config -> cache check -> refresh if needed -> fuzzy search -> Alfred JSON
-- Each result: friendly name as title, domain + state subtitle, domain icon, entity_id + default_action as variables
-- **Depends on:** 1.3, 1.4, 2.2, 2.3
+- [x] **Done** — 2026-03-20
+- `search <query>` wired in `cli.py`: config → open cache → sync refresh on first run → fuzzy search → Alfred JSON
+- Each result: friendly_name title, "domain · state" subtitle, domain icon, entity_id/action/domain variables
+- `cache refresh` and `cache status` subcommands implemented
+- **Tests:** `tests/test_cli.py` updated — 22 tests total
 
 ### 2.5 — Background cache refresh
-- [ ] **Pending**
-- Stale cache: return cached results immediately, spawn detached `subprocess.Popen` to refresh
-- Set Alfred `rerun: 1.0` for re-execution with fresh data
-- PID-based lock file prevents concurrent refreshes
-- **Depends on:** 2.4
+- [x] **Done** — 2026-03-20
+- Stale cache: returns cached results immediately, spawns detached `subprocess.Popen` to refresh
+- Alfred `rerun: 1.0` triggers re-execution with fresh data
+- PID-based lock file (`.refresh.lock`) prevents concurrent refreshes; stale locks cleaned up
+- Lock file removed after `cache refresh` completes
+- **Tests:** background refresh tests in `tests/test_cli.py`
 
 ---
 
 ## Acceptance Criteria
 
-- [ ] `make lint && make typecheck && make test && make build` all pass
+- [x] `make lint && make typecheck && make test && make build` all pass
+- [x] 143 tests passing (4 skipped — live HA integration tests)
+- [x] `.alfredworkflow` artifact builds (14.6 KB)
 - [ ] Manual: `ha living` in Alfred shows matching entities with correct subtitles
 - [ ] Cache file exists in Alfred cache directory after first search
 - [ ] Stale cache returns fast + refreshes in background

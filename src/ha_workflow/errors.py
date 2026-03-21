@@ -9,6 +9,7 @@ import sys
 # Exception hierarchy
 # ---------------------------------------------------------------------------
 
+
 class HAWorkflowError(Exception):
     """Base exception for the HA Alfred workflow."""
 
@@ -28,6 +29,7 @@ class HAAuthError(HAWorkflowError):
 # ---------------------------------------------------------------------------
 # Alfred-friendly error output
 # ---------------------------------------------------------------------------
+
 
 def _error_item(title: str, subtitle: str = "") -> dict[str, object]:
     return {

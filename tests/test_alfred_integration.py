@@ -63,9 +63,14 @@ class TestSubprocessImport:
         assert "items" in data
         assert len(data["items"]) >= 1  # type: ignore[arg-type]
 
-    def test_search_stub(self) -> None:
-        data = _parse_output(_run_cli("search", "test"))
-        assert "not yet implemented" in data["items"][0]["title"]  # type: ignore[index]
+    def test_search_missing_env_shows_error(self) -> None:
+        """Without HA_URL/HA_TOKEN, search should output a config error item."""
+        proc = _run_cli("search", "test")
+        assert proc.returncode == 0
+        data = json.loads(proc.stdout)
+        item = data["items"][0]
+        assert item["valid"] is False
+        assert "HA_URL" in item["subtitle"] or "Configuration" in item["title"]
 
     def test_config_validate_missing_env(self) -> None:
         """Without HA_URL/HA_TOKEN, config validate should output an error item."""
@@ -107,3 +112,23 @@ class TestLiveHAConnection:
         item = data["items"][0]  # type: ignore[index]
         assert item["title"] == "Connected to Home Assistant"
         assert "v" in item["subtitle"]
+
+    def test_search_returns_entities(self) -> None:
+        data = _parse_output(_run_cli("search", "light", env_override=self._live_env()))
+        assert len(data["items"]) >= 1  # type: ignore[arg-type]
+        item = data["items"][0]  # type: ignore[index]
+        assert "variables" in item
+        assert "entity_id" in item["variables"]
+
+    def test_cache_refresh_live(self) -> None:
+        data = _parse_output(
+            _run_cli("cache", "refresh", env_override=self._live_env())
+        )
+        item = data["items"][0]  # type: ignore[index]
+        assert "refreshed" in item["title"].lower()
+
+    def test_cache_status_after_refresh(self) -> None:
+        _run_cli("cache", "refresh", env_override=self._live_env())
+        data = _parse_output(_run_cli("cache", "status", env_override=self._live_env()))
+        item = data["items"][0]  # type: ignore[index]
+        assert "entities" in item["subtitle"]

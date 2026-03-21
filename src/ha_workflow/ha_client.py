@@ -49,12 +49,8 @@ class HAClient:
                 raw: str = resp.read().decode("utf-8")
         except urllib.error.HTTPError as exc:
             if exc.code in (401, 403):
-                raise HAAuthError(
-                    f"Authentication failed (HTTP {exc.code})"
-                ) from exc
-            raise HAConnectionError(
-                f"HTTP {exc.code}: {exc.reason}"
-            ) from exc
+                raise HAAuthError(f"Authentication failed (HTTP {exc.code})") from exc
+            raise HAConnectionError(f"HTTP {exc.code}: {exc.reason}") from exc
         except (urllib.error.URLError, OSError) as exc:
             raise HAConnectionError(str(exc)) from exc
 

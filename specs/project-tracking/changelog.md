@@ -50,3 +50,16 @@ Chronological log of completed work, decisions, and notable events.
 - Added `workflow/prefs.plist` to `.gitignore` (contains secrets)
 
 **Verification:** 55 tests passing (1 skipped — integration test needs live HA), lint/typecheck clean, `.alfredworkflow` builds (7.7 KB). Manual test verified against HA v2026.3.2 with 2778 entities.
+
+### Phase 2 completed on feat/phase-2-cache-search
+
+**Branch:** `feat/phase-2-cache-search`
+
+**What was done:**
+- Entity data model (`entities.py`): `Entity` frozen dataclass with `from_state_dict()`, `DomainConfig` with subtitle formatters, `DOMAIN_REGISTRY` for 31 HA domains
+- SQLite entity cache (`cache.py`): `EntityCache` class with WAL mode, full-replace refresh, staleness detection via `cache_meta` timestamps, `open_cache()` factory
+- Fuzzy search (`search.py`): 5-tier scoring (exact/prefix/word-boundary/substring/char-sequence), weighted fields (friendly_name > entity_id > device_class > area), multi-word query support, capped at 50 results
+- CLI wiring (`cli.py`): `search <query>` command with sync-on-first-run, `cache refresh` and `cache status` subcommands, background refresh with PID lock file and Alfred `rerun: 1.0`
+- Updated integration tests for new search behavior
+
+**Verification:** 143 tests passing (4 skipped — live HA), lint/typecheck clean, `.alfredworkflow` builds (14.6 KB).
