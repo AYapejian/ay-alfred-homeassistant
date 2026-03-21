@@ -57,11 +57,8 @@ _SYSTEM_COMMANDS: list[dict[str, str]] = [
     },
 ]
 
-# macOS system icon — the Preferences app gives a gear/settings look
-_SYSTEM_ICON = AlfredIcon(
-    path="/System/Applications/System Settings.app",
-    type="fileicon",
-)
+# System command icon — grey cog on rounded square
+_SYSTEM_ICON = AlfredIcon(path="icons/_system.png")
 
 
 def _match_system_commands(query: str) -> list[AlfredItem]:
@@ -166,7 +163,11 @@ def _build_search_output(entities: list[Entity]) -> AlfredOutput:
     items: list[AlfredItem] = []
     for entity in entities:
         dc = get_domain_config(entity.domain)
-        subtitle = f"{entity.domain} \u00b7 {dc.subtitle_formatter(entity)}"
+        state_text = dc.subtitle_formatter(entity)
+        # Use area name as subtitle prefix when available, fall back to domain
+        area = entity.attributes.get("area_name") or entity.attributes.get("area_id")
+        prefix = str(area) if area else entity.domain
+        subtitle = f"{prefix} \u00b7 {state_text}"
 
         item = AlfredItem(
             title=entity.friendly_name,

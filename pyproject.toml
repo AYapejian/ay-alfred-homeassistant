@@ -58,3 +58,9 @@ testpaths = ["tests"]
 markers = [
   "integration: tests requiring a real Home Assistant instance",
 ]
+
+[dependency-groups]
+dev = [
+    "cairosvg>=2.8.2",
+    "pillow>=11.3.0",
+]

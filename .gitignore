@@ -24,6 +24,7 @@ secrets.yml
 .AppleDouble
 .LSOverride
 Icon?
+!workflow/icons/
 ._*
 .Spotlight-V100
 .Trashes
