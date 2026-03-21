@@ -28,9 +28,10 @@ class Entity:
     attributes: dict[str, Any]
     last_changed: str
     last_updated: str
+    area_name: str = ""
 
     @classmethod
-    def from_state_dict(cls, data: dict[str, Any]) -> Entity:
+    def from_state_dict(cls, data: dict[str, Any], area_name: str = "") -> Entity:
         """Convert an HA REST API state dict to an :class:`Entity`."""
         entity_id: str = data["entity_id"]
         domain = entity_id.split(".", 1)[0]
@@ -43,6 +44,7 @@ class Entity:
             attributes=attrs,
             last_changed=data.get("last_changed", ""),
             last_updated=data.get("last_updated", ""),
+            area_name=area_name,
         )
 
     @property

@@ -10,6 +10,7 @@ from __future__ import annotations
 import os
 import subprocess
 import sys
+from typing import Optional
 
 # When Alfred runs ``python3 ha_workflow/cli.py …``, Python sets sys.path[0]
 # to the ha_workflow/ directory (the script's parent).  Package-level imports
@@ -108,13 +109,41 @@ def _dbg(msg: str) -> None:
         sys.stderr.flush()
 
 
+def _build_area_lookup(client: HAClient) -> dict[str, str]:
+    """Fetch entity + area registries and return ``{entity_id: area_name}``."""
+    areas = client.get_area_registry()
+    area_names: dict[str, str] = {}
+    for area in areas:
+        aid = area.get("area_id", "")
+        name = area.get("name", "")
+        if aid and name:
+            area_names[aid] = name
+
+    entity_reg = client.get_entity_registry()
+    lookup: dict[str, str] = {}
+    for entry in entity_reg:
+        eid = entry.get("entity_id", "")
+        aid = entry.get("area_id", "")
+        if eid and aid and aid in area_names:
+            lookup[eid] = area_names[aid]
+
+    return lookup
+
+
 def _refresh_cache(config: Config, cache: EntityCache) -> None:
     """Synchronously fetch all states from HA and replace the cache."""
     _dbg(f"refresh_cache: url={config.ha_url[:40]}")
     client = HAClient(config)
     states = client.get_states()
     _dbg(f"refresh_cache: get_states returned {len(states)} items")
-    entities = [Entity.from_state_dict(s) for s in states]
+
+    area_lookup = _build_area_lookup(client)
+    _dbg(f"refresh_cache: area_lookup has {len(area_lookup)} entries")
+
+    entities = [
+        Entity.from_state_dict(s, area_name=area_lookup.get(s.get("entity_id", ""), ""))
+        for s in states
+    ]
     cache.refresh(entities)
     _dbg(f"refresh_cache: wrote {len(entities)} entities to cache")
 
@@ -165,8 +194,7 @@ def _build_search_output(entities: list[Entity]) -> AlfredOutput:
         dc = get_domain_config(entity.domain)
         state_text = dc.subtitle_formatter(entity)
         # Use area name as subtitle prefix when available, fall back to domain
-        area = entity.attributes.get("area_name") or entity.attributes.get("area_id")
-        prefix = str(area) if area else entity.domain
+        prefix = entity.area_name if entity.area_name else entity.domain
         subtitle = f"{prefix} \u00b7 {state_text}"
 
         item = AlfredItem(
@@ -460,7 +488,7 @@ def _cmd_stub(name: str) -> None:
 # ---------------------------------------------------------------------------
 
 
-def main(argv: list[str] | None = None) -> None:
+def main(argv: Optional[list[str]] = None) -> None:
     """Dispatch CLI commands."""
     args = argv if argv is not None else sys.argv[1:]
 

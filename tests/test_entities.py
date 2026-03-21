@@ -106,6 +106,16 @@ class TestFromStateDict:
         e = Entity.from_state_dict(data)
         assert e.domain == "binary_sensor"
 
+    def test_area_name_default_empty(self) -> None:
+        data = _state_dict()
+        e = Entity.from_state_dict(data)
+        assert e.area_name == ""
+
+    def test_area_name_passed_through(self) -> None:
+        data = _state_dict()
+        e = Entity.from_state_dict(data, area_name="Kitchen")
+        assert e.area_name == "Kitchen"
+
 
 class TestDeviceClass:
     def test_present(self) -> None:

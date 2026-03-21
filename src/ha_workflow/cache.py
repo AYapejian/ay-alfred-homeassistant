@@ -38,7 +38,8 @@ class EntityCache:
                 friendly_name TEXT NOT NULL,
                 attributes_json TEXT NOT NULL,
                 last_changed  TEXT NOT NULL,
-                last_updated  TEXT NOT NULL
+                last_updated  TEXT NOT NULL,
+                area_name     TEXT NOT NULL DEFAULT ''
             );
 
             CREATE INDEX IF NOT EXISTS idx_entities_domain
@@ -52,6 +53,13 @@ class EntityCache:
             );
             """
         )
+        # Migrate existing databases that lack the area_name column.
+        try:
+            self._conn.execute("SELECT area_name FROM entities LIMIT 1")
+        except sqlite3.OperationalError:
+            self._conn.execute(
+                "ALTER TABLE entities ADD COLUMN area_name TEXT NOT NULL DEFAULT ''"
+            )
         self._conn.commit()
 
     # ------------------------------------------------------------------
@@ -65,8 +73,8 @@ class EntityCache:
         cur.executemany(
             "INSERT INTO entities "
             "(entity_id, domain, state, friendly_name, "
-            "attributes_json, last_changed, last_updated) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?)",
+            "attributes_json, last_changed, last_updated, area_name) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
             [
                 (
                     e.entity_id,
@@ -76,6 +84,7 @@ class EntityCache:
                     json.dumps(e.attributes),
                     e.last_changed,
                     e.last_updated,
+                    e.area_name,
                 )
                 for e in entities
             ],
@@ -90,7 +99,7 @@ class EntityCache:
         """Return every cached entity."""
         cur = self._conn.execute(
             "SELECT entity_id, domain, state, friendly_name, "
-            "attributes_json, last_changed, last_updated "
+            "attributes_json, last_changed, last_updated, area_name "
             "FROM entities"
         )
         return [self._row_to_entity(row) for row in cur.fetchall()]
@@ -99,7 +108,7 @@ class EntityCache:
         """Return all cached entities in the given *domain*."""
         cur = self._conn.execute(
             "SELECT entity_id, domain, state, friendly_name, "
-            "attributes_json, last_changed, last_updated "
+            "attributes_json, last_changed, last_updated, area_name "
             "FROM entities WHERE domain = ?",
             (domain,),
         )
@@ -117,7 +126,7 @@ class EntityCache:
         pattern = f"%{query}%"
         cur = self._conn.execute(
             "SELECT entity_id, domain, state, friendly_name, "
-            "attributes_json, last_changed, last_updated "
+            "attributes_json, last_changed, last_updated, area_name "
             "FROM entities "
             "WHERE entity_id LIKE ? OR friendly_name LIKE ?",
             (pattern, pattern),
@@ -159,6 +168,7 @@ class EntityCache:
             attributes=json.loads(row[4]),
             last_changed=row[5],
             last_updated=row[6],
+            area_name=row[7] if len(row) > 7 else "",
         )
 
 
