@@ -17,10 +17,9 @@ This is **not** a Home Assistant add-on. There is no Docker container or HA supe
 
 ## Project Status
 
-**Phase:** Implementation — Phase 0 (Foundation & CI/Packaging)
+See `specs/project-tracking/status.md` for current phase, task progress, and key decisions.
 
-**Stack decision:** Python, targeting 3.9+ runtime (system `/usr/bin/python3` on macOS) for zero-friction distribution. Dev tooling (ruff, mypy, pytest) runs under local Python 3.12+. See `specs/spec-000-init.md` for original requirements and the plan file for full architecture.
-
+**Stack:** Python 3.9+ runtime, `uv` + ruff/mypy/pytest dev tooling.
 **Action UX:** Enter = smart default action per entity domain. Cmd modifier = action sub-menu.
 **Cache:** Pull-based REST with SQLite. WebSocket listener deferred.
 **Config:** Alfred 5 Workflow Environment Variables (`HA_URL`, `HA_TOKEN`).
@@ -46,15 +45,34 @@ This is **not** a Home Assistant add-on. There is no Docker container or HA supe
 
 ---
 
-## GitHub Workflow
+## Project Tracking
 
-This project follows a GitHub Issues + PR workflow under the **AYapejian** account.
+All task planning, progress, and completion is tracked in `specs/project-tracking/`. This is the source of truth for project state — do not rely solely on agentic memory or conversation context.
 
-- Every piece of work starts with a GitHub Issue
+- **Entry point:** `specs/project-tracking/status.md` — current phase, key decisions, phase overview
+- **Per-phase files:** `specs/project-tracking/phase-N-*.md` — task breakdowns, acceptance criteria, status checkboxes
+- **Changelog:** `specs/project-tracking/changelog.md` — chronological log of completed work
+
+### Tracking rules
+
+- **When planning tasks:** update the relevant `phase-N-*.md` with task breakdowns
+- **When starting a task:** note the date in the phase file
+- **When completing a task:** check the box `[x]`, note the date and commit hash
+- **When a task errors or is blocked:** mark with `[!]` and log the issue inline
+- **When a phase completes:** update `status.md` current state table and add a `changelog.md` entry
+- **When key decisions are made:** add to the "Key Decisions" table in `status.md`
+
+---
+
+## Git Workflow
+
+This project follows a GitHub Issues + PR workflow under the **AYapejian** account. No GitHub remote exists yet — all work is local for now.
+
 - Each PR represents one coherent, reviewable unit of work
-- **Branch naming:** `feat/<issue-number>-short-description`, `fix/<issue-number>-short-description`
-- **PR title format:** `feat:`, `fix:`, `chore:`, `docs:`, etc.
-- **Merge strategy:** Squash and merge
+- **Branch naming:** `feat/phase-N-short-description` for phase work, `fix/<description>` for bug fixes
+- **Commit message prefixes:** `feat:`, `fix:`, `chore:`, `docs:`, etc.
+- **Merge strategy:** Fast-forward merge to `main` when local (squash and merge when remote PRs exist)
+- **Phase workflow:** create a feature branch per phase off `main`, commit tasks incrementally, merge to `main` when the phase is complete, then create the next phase branch
 
 ---
 
