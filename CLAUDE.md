@@ -69,11 +69,32 @@ All task planning, progress, and completion is tracked in `specs/project-trackin
 This project uses a GitHub Issues + PR workflow under the **AYapejian** account.
 Repository: `AYapejian/ay-alfred-homeassistant`
 
+### Branches & Commits
+
 - Each PR represents one coherent, reviewable unit of work
-- **Branch naming:** `feat/phase-N-short-description` for phase work, `fix/<description>` for bug fixes, `chore/<description>` for maintenance
+- **Branch naming:** `feat/<issue-N>-short-description`, `fix/<issue-N>-short-description`, `chore/<issue-N>-short-description`
 - **Commit message prefixes:** `feat:`, `fix:`, `chore:`, `docs:`, etc.
 - **Merge strategy:** Squash and merge for PRs. Fast-forward merge for local-only work.
-- **Phase workflow:** create a feature branch per phase off `main`, commit tasks incrementally, open a PR, merge to `main` when the phase is complete
+
+### Issues & PRs
+
+- **All work is tracked via GitHub Issues.** Each issue maps to one PR.
+- **PR body must reference its issue:** use `Closes #N` to auto-close the issue on merge.
+- **Issues cross-reference dependencies:** use `Depends on #N` in issue bodies.
+- **Issues link to spec docs and source files** in the repo for full context.
+- **Milestones** group issues by phase. Issues can move between milestones freely.
+
+### Labels
+
+| Category | Labels | Purpose |
+|----------|--------|---------|
+| Type | `feature`, `bug`, `chore`, `docs`, `idea` | What kind of work |
+| Area | `area/search`, `area/actions`, `area/cache`, `area/cli`, `area/config`, `area/infra` | What part of the codebase |
+| Priority | `P1-high`, `P2-medium`, `P3-low` | Triage ordering |
+| Status | `blocked` | Exceptional states only |
+
+### CI & Releases
+
 - **CI:** GitHub Actions runs lint, format check, type check, tests, and build on every push to `main` and every PR. See `.github/workflows/ci.yml`.
 - **Releases:** Tag with `vX.Y.Z` to trigger the release workflow, which builds the `.alfredworkflow` and creates a GitHub Release. See `.github/workflows/release.yml`.
 
