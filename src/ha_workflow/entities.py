@@ -146,85 +146,113 @@ _DC = DomainConfig  # shorthand
 DOMAIN_REGISTRY: dict[str, DomainConfig] = {
     # Toggleable entities
     "light": _DC(
-        "toggle", ("toggle", "turn_on", "turn_off"), "icon.png", _light_subtitle
+        "toggle", ("toggle", "turn_on", "turn_off"), "icons/light.png", _light_subtitle
     ),
     "switch": _DC(
-        "toggle", ("toggle", "turn_on", "turn_off"), "icon.png", _default_subtitle
+        "toggle",
+        ("toggle", "turn_on", "turn_off"),
+        "icons/switch.png",
+        _default_subtitle,
     ),
     "fan": _DC(
-        "toggle", ("toggle", "turn_on", "turn_off"), "icon.png", _default_subtitle
+        "toggle", ("toggle", "turn_on", "turn_off"), "icons/fan.png", _default_subtitle
     ),
     "humidifier": _DC(
-        "toggle", ("toggle", "turn_on", "turn_off"), "icon.png", _default_subtitle
+        "toggle",
+        ("toggle", "turn_on", "turn_off"),
+        "icons/humidifier.png",
+        _default_subtitle,
     ),
-    "water_heater": _DC("toggle", ("toggle",), "icon.png", _default_subtitle),
+    "water_heater": _DC(
+        "toggle", ("toggle",), "icons/water_heater.png", _default_subtitle
+    ),
     "siren": _DC(
-        "toggle", ("toggle", "turn_on", "turn_off"), "icon.png", _default_subtitle
+        "toggle",
+        ("toggle", "turn_on", "turn_off"),
+        "icons/siren.png",
+        _default_subtitle,
     ),
     "input_boolean": _DC(
-        "toggle", ("toggle", "turn_on", "turn_off"), "icon.png", _default_subtitle
+        "toggle",
+        ("toggle", "turn_on", "turn_off"),
+        "icons/input_boolean.png",
+        _default_subtitle,
     ),
     "group": _DC(
-        "toggle", ("toggle", "turn_on", "turn_off"), "icon.png", _default_subtitle
+        "toggle",
+        ("toggle", "turn_on", "turn_off"),
+        "icons/group.png",
+        _default_subtitle,
     ),
     # Sensors (display-only)
-    "sensor": _DC("", (), "icon.png", _sensor_subtitle),
-    "binary_sensor": _DC("", (), "icon.png", _default_subtitle),
-    "weather": _DC("", (), "icon.png", _sensor_subtitle),
+    "sensor": _DC("", (), "icons/sensor.png", _sensor_subtitle),
+    "binary_sensor": _DC("", (), "icons/binary_sensor.png", _default_subtitle),
+    "weather": _DC("", (), "icons/weather.png", _sensor_subtitle),
     # Automation / scripting
     "automation": _DC(
         "toggle",
         ("toggle", "trigger", "turn_on", "turn_off"),
-        "icon.png",
+        "icons/automation.png",
         _default_subtitle,
     ),
-    "script": _DC("turn_on", ("turn_on",), "icon.png", _default_subtitle),
-    "scene": _DC("turn_on", ("turn_on",), "icon.png", _default_subtitle),
+    "script": _DC("turn_on", ("turn_on",), "icons/script.png", _default_subtitle),
+    "scene": _DC("turn_on", ("turn_on",), "icons/scene.png", _default_subtitle),
     # Complex entities
     "climate": _DC(
-        "toggle", ("toggle", "set_temperature"), "icon.png", _climate_subtitle
+        "toggle",
+        ("toggle", "set_temperature"),
+        "icons/climate.png",
+        _climate_subtitle,
     ),
     "media_player": _DC(
         "toggle",
         ("toggle", "media_play", "media_pause", "media_stop"),
-        "icon.png",
+        "icons/media_player.png",
         _media_player_subtitle,
     ),
     "cover": _DC(
         "toggle",
         ("toggle", "open_cover", "close_cover", "stop_cover"),
-        "icon.png",
+        "icons/cover.png",
         _cover_subtitle,
     ),
-    "lock": _DC("lock", ("lock", "unlock"), "icon.png", _default_subtitle),
+    "lock": _DC("lock", ("lock", "unlock"), "icons/lock.png", _default_subtitle),
     "vacuum": _DC(
-        "start", ("start", "stop", "return_to_base"), "icon.png", _default_subtitle
+        "start",
+        ("start", "stop", "return_to_base"),
+        "icons/vacuum.png",
+        _default_subtitle,
     ),
-    "camera": _DC("", (), "icon.png", _default_subtitle),
+    "camera": _DC("", (), "icons/camera.png", _default_subtitle),
     # People / zones
-    "person": _DC("", (), "icon.png", _default_subtitle),
-    "zone": _DC("", (), "icon.png", _default_subtitle),
+    "person": _DC("", (), "icons/person.png", _default_subtitle),
+    "zone": _DC("", (), "icons/zone.png", _default_subtitle),
     # Input helpers
-    "input_number": _DC("", (), "icon.png", _sensor_subtitle),
-    "input_select": _DC("", (), "icon.png", _default_subtitle),
-    "input_text": _DC("", (), "icon.png", _default_subtitle),
-    "input_datetime": _DC("", (), "icon.png", _default_subtitle),
-    "number": _DC("", (), "icon.png", _sensor_subtitle),
-    "select": _DC("", (), "icon.png", _default_subtitle),
+    "input_number": _DC("", (), "icons/input_number.png", _sensor_subtitle),
+    "input_select": _DC("", (), "icons/input_select.png", _default_subtitle),
+    "input_text": _DC("", (), "icons/input_text.png", _default_subtitle),
+    "input_datetime": _DC("", (), "icons/input_datetime.png", _default_subtitle),
+    "number": _DC("", (), "icons/number.png", _sensor_subtitle),
+    "select": _DC("", (), "icons/select.png", _default_subtitle),
     # Action entities
-    "button": _DC("press", ("press",), "icon.png", _default_subtitle),
-    "timer": _DC("start", ("start", "cancel", "pause"), "icon.png", _default_subtitle),
+    "button": _DC("press", ("press",), "icons/button.png", _default_subtitle),
+    "timer": _DC(
+        "start", ("start", "cancel", "pause"), "icons/timer.png", _default_subtitle
+    ),
     "counter": _DC(
-        "increment", ("increment", "decrement", "reset"), "icon.png", _default_subtitle
+        "increment",
+        ("increment", "decrement", "reset"),
+        "icons/counter.png",
+        _default_subtitle,
     ),
     # System
-    "update": _DC("install", ("install", "skip"), "icon.png", _update_subtitle),
+    "update": _DC("install", ("install", "skip"), "icons/update.png", _update_subtitle),
 }
 
 _UNKNOWN_DOMAIN = DomainConfig(
     default_action="",
     available_actions=(),
-    icon_path="icon.png",
+    icon_path="icons/_default.png",
     subtitle_formatter=_default_subtitle,
 )
 

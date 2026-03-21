@@ -644,9 +644,8 @@ class TestSystemCommandsInSearch:
         assert first["valid"] is True
         assert first["variables"]["action"] == "usage_clear"
         assert first["variables"]["entity_id"] == "__system__"
-        # Distinct icon — uses macOS system icon, not the workflow icon
-        assert first["icon"]["type"] == "fileicon"
-        assert first["icon"]["path"] != "icon.png"
+        # Distinct icon — uses system command icon, not the workflow icon
+        assert first["icon"]["path"] == "icons/_system.png"
         # Subtitle has "System" prefix
         assert first["subtitle"].startswith("System")
 
