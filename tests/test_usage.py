@@ -17,9 +17,7 @@ def _mem_tracker() -> UsageTracker:
 class TestSchema:
     def test_table_created(self) -> None:
         tracker = _mem_tracker()
-        cur = tracker._conn.execute(
-            "SELECT name FROM sqlite_master WHERE type='table'"
-        )
+        cur = tracker._conn.execute("SELECT name FROM sqlite_master WHERE type='table'")
         tables = {row[0] for row in cur.fetchall()}
         assert "usage_stats" in tables
         tracker.close()

@@ -83,9 +83,7 @@ def sort_by_usage(
     ts = now if now is not None else time.time()
 
     if not usage_stats:
-        return sorted(
-            entities, key=lambda e: e.friendly_name.lower()
-        )[:max_results]
+        return sorted(entities, key=lambda e: e.friendly_name.lower())[:max_results]
 
     return sorted(
         entities,

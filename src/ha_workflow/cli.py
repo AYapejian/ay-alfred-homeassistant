@@ -307,9 +307,7 @@ def _search_domain_filtered(
     """Handle domain-filtered search (e.g. ``light:bedroom``)."""
     domain_entities = cache.get_by_domain(parsed.domain_filter or "")
     _dbg(f"search: {len(domain_entities)} entities in domain {parsed.domain_filter}")
-    results = fuzzy_search(
-        domain_entities, parsed.text, usage_stats=usage_stats
-    )
+    results = fuzzy_search(domain_entities, parsed.text, usage_stats=usage_stats)
     _dbg(f"search: {len(results)} results for {parsed.text!r}")
     return _build_search_output(results)
 
@@ -322,9 +320,7 @@ def _search_fuzzy(
     """Handle standard fuzzy search with optional domain suggestions."""
     all_entities = cache.get_all()
     _dbg(f"search: {len(all_entities)} entities in cache")
-    results = fuzzy_search(
-        all_entities, parsed.text, usage_stats=usage_stats
-    )
+    results = fuzzy_search(all_entities, parsed.text, usage_stats=usage_stats)
     _dbg(f"search: {len(results)} results for {parsed.text!r}")
     output = _build_search_output(results)
 

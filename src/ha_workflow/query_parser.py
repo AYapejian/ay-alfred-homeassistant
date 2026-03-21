@@ -55,11 +55,7 @@ def parse_query(raw: str) -> ParsedQuery:
     stripped = raw.strip()
 
     # 1. Regex syntax: /pattern/
-    if (
-        len(stripped) >= 2
-        and stripped.startswith("/")
-        and stripped.endswith("/")
-    ):
+    if len(stripped) >= 2 and stripped.startswith("/") and stripped.endswith("/"):
         pattern = stripped[1:-1]
         return ParsedQuery(
             mode="regex",

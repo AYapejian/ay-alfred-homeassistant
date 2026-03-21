@@ -66,13 +66,16 @@ All task planning, progress, and completion is tracked in `specs/project-trackin
 
 ## Git Workflow
 
-This project follows a GitHub Issues + PR workflow under the **AYapejian** account. No GitHub remote exists yet — all work is local for now.
+This project uses a GitHub Issues + PR workflow under the **AYapejian** account.
+Repository: `AYapejian/ay-alfred-homeassistant`
 
 - Each PR represents one coherent, reviewable unit of work
-- **Branch naming:** `feat/phase-N-short-description` for phase work, `fix/<description>` for bug fixes
+- **Branch naming:** `feat/phase-N-short-description` for phase work, `fix/<description>` for bug fixes, `chore/<description>` for maintenance
 - **Commit message prefixes:** `feat:`, `fix:`, `chore:`, `docs:`, etc.
-- **Merge strategy:** Fast-forward merge to `main` when local (squash and merge when remote PRs exist)
-- **Phase workflow:** create a feature branch per phase off `main`, commit tasks incrementally, merge to `main` when the phase is complete, then create the next phase branch
+- **Merge strategy:** Squash and merge for PRs. Fast-forward merge for local-only work.
+- **Phase workflow:** create a feature branch per phase off `main`, commit tasks incrementally, open a PR, merge to `main` when the phase is complete
+- **CI:** GitHub Actions runs lint, format check, type check, tests, and build on every push to `main` and every PR. See `.github/workflows/ci.yml`.
+- **Releases:** Tag with `vX.Y.Z` to trigger the release workflow, which builds the `.alfredworkflow` and creates a GitHub Release. See `.github/workflows/release.yml`.
 
 ---
 

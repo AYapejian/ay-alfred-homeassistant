@@ -57,7 +57,6 @@
 
 ## Architecture Reference
 
-Full plan: `.claude/plans/tidy-shimmying-marble.md`
 Spec: `specs/spec-000-init.md`
 
 ```

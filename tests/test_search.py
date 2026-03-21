@@ -295,9 +295,7 @@ class TestEdgeCases:
 class TestUsageBoost:
     """Tests for the usage_stats integration in fuzzy_search."""
 
-    def _usage(
-        self, entity_id: str, count: int, last_used: float
-    ) -> dict[str, Any]:
+    def _usage(self, entity_id: str, count: int, last_used: float) -> dict[str, Any]:
         from ha_workflow.usage import UsageRecord
 
         return {
@@ -387,9 +385,7 @@ class TestUsageBoost:
         stats = {
             "vacuum.roborock": UsageRecord("vacuum.roborock", 1000, now),
         }
-        results = fuzzy_search(
-            ENTITIES, "kitchen", usage_stats=stats, now=now
-        )
+        results = fuzzy_search(ENTITIES, "kitchen", usage_stats=stats, now=now)
         ids = [e.entity_id for e in results]
         # roborock doesn't match "kitchen" regardless of usage
         assert "vacuum.roborock" not in ids

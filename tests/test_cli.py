@@ -226,7 +226,8 @@ class TestSearchCommand:
         data = json.loads(out)
         # System commands prepended + 3 entities
         entity_items = [
-            i for i in data["items"]
+            i
+            for i in data["items"]
             if i.get("variables", {}).get("domain") != "__system__"
         ]
         assert len(entity_items) == 3
@@ -693,7 +694,8 @@ class TestSystemCommandsInSearch:
         out = capsys.readouterr().out  # type: ignore[union-attr]
         data = json.loads(out)
         sys_items = [
-            i for i in data["items"]
+            i
+            for i in data["items"]
             if i.get("variables", {}).get("domain") == "__system__"
         ]
         assert sys_items == []
