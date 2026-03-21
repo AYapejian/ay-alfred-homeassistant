@@ -37,6 +37,10 @@ select = [
   "SIM", # flake8-simplify
   "RUF", # ruff-specific
 ]
+ignore = [
+  "UP007",  # Union[X, Y] -> X | Y — keep Union/Optional for 3.9 compat (no X|Y union syntax)
+  "UP045",  # Optional[X] -> X | None — same reason
+]
 
 [tool.ruff.lint.isort]
 known-first-party = ["ha_workflow"]

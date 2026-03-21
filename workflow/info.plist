@@ -4,18 +4,213 @@
 <dict>
 	<key>bundleid</key>
 	<string>com.ayapejian.alfred-homeassistant</string>
-	<key>name</key>
-	<string>Home Assistant</string>
-	<key>description</key>
-	<string>Search and control Home Assistant entities from Alfred</string>
-	<key>version</key>
-	<string>0.1.0</string>
-	<key>createdby</key>
-	<string>AYapejian</string>
 	<key>category</key>
 	<string>Productivity</string>
+	<key>connections</key>
+	<dict>
+		<key>run-script-action</key>
+		<array>
+			<dict>
+				<key>destinationuid</key>
+				<string>notification-action-result</string>
+				<key>modifiers</key>
+				<integer>0</integer>
+				<key>modifiersubtext</key>
+				<string></string>
+				<key>vitoclose</key>
+				<false/>
+			</dict>
+		</array>
+		<key>script-filter-actions</key>
+		<array>
+			<dict>
+				<key>destinationuid</key>
+				<string>run-script-action</string>
+				<key>modifiers</key>
+				<integer>0</integer>
+				<key>modifiersubtext</key>
+				<string></string>
+				<key>vitoclose</key>
+				<false/>
+			</dict>
+		</array>
+		<key>script-filter-search</key>
+		<array>
+			<dict>
+				<key>destinationuid</key>
+				<string>run-script-action</string>
+				<key>modifiers</key>
+				<integer>0</integer>
+				<key>modifiersubtext</key>
+				<string></string>
+				<key>vitoclose</key>
+				<false/>
+			</dict>
+			<dict>
+				<key>destinationuid</key>
+				<string>script-filter-actions</string>
+				<key>modifiers</key>
+				<integer>1048576</integer>
+				<key>modifiersubtext</key>
+				<string>Show available actions</string>
+				<key>vitoclose</key>
+				<false/>
+			</dict>
+		</array>
+	</dict>
+	<key>createdby</key>
+	<string>AYapejian</string>
+	<key>description</key>
+	<string>Search and control Home Assistant entities from Alfred</string>
 	<key>disabled</key>
 	<false/>
+	<key>name</key>
+	<string>Home Assistant</string>
+	<key>objects</key>
+	<array>
+		<dict>
+			<key>config</key>
+			<dict>
+				<key>concurrently</key>
+				<false/>
+				<key>escaping</key>
+				<integer>0</integer>
+				<key>script</key>
+				<string>/usr/bin/python3 ha_workflow/cli.py action "$entity_id" "$action"</string>
+				<key>scriptargtype</key>
+				<integer>1</integer>
+				<key>scriptfile</key>
+				<string></string>
+				<key>type</key>
+				<integer>0</integer>
+			</dict>
+			<key>type</key>
+			<string>alfred.workflow.action.script</string>
+			<key>uid</key>
+			<string>run-script-action</string>
+			<key>version</key>
+			<integer>2</integer>
+		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
+				<key>alfredfiltersresults</key>
+				<false/>
+				<key>alfredfiltersresultsmatchmode</key>
+				<integer>0</integer>
+				<key>argumenttreatemptyqueryasnil</key>
+				<false/>
+				<key>argumenttrimmode</key>
+				<integer>0</integer>
+				<key>argumenttype</key>
+				<integer>1</integer>
+				<key>escaping</key>
+				<integer>0</integer>
+				<key>keyword</key>
+				<string>ha</string>
+				<key>queuedelaycustom</key>
+				<integer>1</integer>
+				<key>queuedelayimmediatelyinitially</key>
+				<false/>
+				<key>queuedelaymode</key>
+				<integer>0</integer>
+				<key>queuemode</key>
+				<integer>1</integer>
+				<key>runningsubtext</key>
+				<string>Searching Home Assistant...</string>
+				<key>script</key>
+				<string>/usr/bin/python3 ha_workflow/cli.py search "{query}"</string>
+				<key>scriptargtype</key>
+				<integer>1</integer>
+				<key>scriptfile</key>
+				<string></string>
+				<key>subtext</key>
+				<string>Search Home Assistant entities</string>
+				<key>title</key>
+				<string>Home Assistant</string>
+				<key>type</key>
+				<integer>0</integer>
+				<key>withspace</key>
+				<true/>
+			</dict>
+			<key>type</key>
+			<string>alfred.workflow.input.scriptfilter</string>
+			<key>uid</key>
+			<string>script-filter-search</string>
+			<key>version</key>
+			<integer>3</integer>
+		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
+				<key>lastpathcomponent</key>
+				<false/>
+				<key>onlyshowifquerypopulated</key>
+				<true/>
+				<key>removeextension</key>
+				<false/>
+				<key>text</key>
+				<string>{query}</string>
+				<key>title</key>
+				<string>Home Assistant</string>
+			</dict>
+			<key>type</key>
+			<string>alfred.workflow.output.notification</string>
+			<key>uid</key>
+			<string>notification-action-result</string>
+			<key>version</key>
+			<integer>1</integer>
+		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
+				<key>alfredfiltersresults</key>
+				<false/>
+				<key>alfredfiltersresultsmatchmode</key>
+				<integer>0</integer>
+				<key>argumenttreatemptyqueryasnil</key>
+				<false/>
+				<key>argumenttrimmode</key>
+				<integer>0</integer>
+				<key>argumenttype</key>
+				<integer>1</integer>
+				<key>escaping</key>
+				<integer>0</integer>
+				<key>keyword</key>
+				<string></string>
+				<key>queuedelaycustom</key>
+				<integer>1</integer>
+				<key>queuedelayimmediatelyinitially</key>
+				<false/>
+				<key>queuedelaymode</key>
+				<integer>0</integer>
+				<key>queuemode</key>
+				<integer>1</integer>
+				<key>runningsubtext</key>
+				<string>Loading actions...</string>
+				<key>script</key>
+				<string>/usr/bin/python3 ha_workflow/cli.py actions "$entity_id"</string>
+				<key>scriptargtype</key>
+				<integer>1</integer>
+				<key>scriptfile</key>
+				<string></string>
+				<key>subtext</key>
+				<string></string>
+				<key>title</key>
+				<string></string>
+				<key>type</key>
+				<integer>0</integer>
+				<key>withspace</key>
+				<true/>
+			</dict>
+			<key>type</key>
+			<string>alfred.workflow.input.scriptfilter</string>
+			<key>uid</key>
+			<string>script-filter-actions</string>
+			<key>version</key>
+			<integer>3</integer>
+		</dict>
+	</array>
 	<key>readme</key>
 	<string>Alfred workflow for Home Assistant. Search entities, execute actions, and manage your smart home from Alfred.
 
@@ -23,8 +218,37 @@ Configuration:
 - HA_URL: Your Home Assistant URL (e.g., http://homeassistant.local:8123)
 - HA_TOKEN: A long-lived access token from HA
 - CACHE_TTL: Cache refresh interval in seconds (default: 60)</string>
-
-	<!-- Workflow Environment Variables -->
+	<key>uidata</key>
+	<dict>
+		<key>notification-action-result</key>
+		<dict>
+			<key>xpos</key>
+			<real>700</real>
+			<key>ypos</key>
+			<real>200</real>
+		</dict>
+		<key>run-script-action</key>
+		<dict>
+			<key>xpos</key>
+			<real>400</real>
+			<key>ypos</key>
+			<real>200</real>
+		</dict>
+		<key>script-filter-actions</key>
+		<dict>
+			<key>xpos</key>
+			<real>400</real>
+			<key>ypos</key>
+			<real>400</real>
+		</dict>
+		<key>script-filter-search</key>
+		<dict>
+			<key>xpos</key>
+			<real>100</real>
+			<key>ypos</key>
+			<real>200</real>
+		</dict>
+	</dict>
 	<key>userconfigurationconfig</key>
 	<array>
 		<dict>
@@ -91,213 +315,7 @@ Configuration:
 			<string>CACHE_TTL</string>
 		</dict>
 	</array>
-
-	<!-- Workflow Objects -->
-	<key>objects</key>
-	<array>
-		<!-- Object 0: Script Filter (keyword: ha) -->
-		<dict>
-			<key>config</key>
-			<dict>
-				<key>alfredfiltersresults</key>
-				<false/>
-				<key>argumenttype</key>
-				<integer>1</integer>
-				<key>keyword</key>
-				<string>ha</string>
-				<key>runningsubtext</key>
-				<string>Searching Home Assistant...</string>
-				<key>script</key>
-				<string>/usr/bin/python3 ha_workflow/cli.py search "{query}"</string>
-				<key>scriptargtype</key>
-				<integer>1</integer>
-				<key>scriptfile</key>
-				<string></string>
-				<key>subtext</key>
-				<string>Search Home Assistant entities</string>
-				<key>title</key>
-				<string>Home Assistant</string>
-				<key>type</key>
-				<integer>0</integer>
-				<key>withspace</key>
-				<true/>
-			</dict>
-			<key>type</key>
-			<string>alfred.workflow.input.scriptfilter</string>
-			<key>uid</key>
-			<string>script-filter-search</string>
-			<key>version</key>
-			<integer>3</integer>
-		</dict>
-		<!-- Object 1: Run Script (default action on Enter) -->
-		<dict>
-			<key>config</key>
-			<dict>
-				<key>concurrently</key>
-				<false/>
-				<key>script</key>
-				<string>/usr/bin/python3 ha_workflow/cli.py action "$entity_id" "$action"</string>
-				<key>scriptargtype</key>
-				<integer>1</integer>
-				<key>scriptfile</key>
-				<string></string>
-				<key>type</key>
-				<integer>0</integer>
-			</dict>
-			<key>type</key>
-			<string>alfred.workflow.action.script</string>
-			<key>uid</key>
-			<string>run-script-action</string>
-			<key>version</key>
-			<integer>2</integer>
-		</dict>
-		<!-- Object 2: Post Notification (action feedback) -->
-		<dict>
-			<key>config</key>
-			<dict>
-				<key>lastpathcomponent</key>
-				<false/>
-				<key>onlyshowifquerypopulated</key>
-				<true/>
-				<key>removeextension</key>
-				<false/>
-				<key>text</key>
-				<string>{query}</string>
-				<key>title</key>
-				<string>Home Assistant</string>
-			</dict>
-			<key>type</key>
-			<string>alfred.workflow.output.notification</string>
-			<key>uid</key>
-			<string>notification-action-result</string>
-			<key>version</key>
-			<integer>1</integer>
-		</dict>
-		<!-- Object 3: Script Filter (action sub-menu via Cmd) -->
-		<dict>
-			<key>config</key>
-			<dict>
-				<key>alfredfiltersresults</key>
-				<false/>
-				<key>argumenttype</key>
-				<integer>1</integer>
-				<key>keyword</key>
-				<string></string>
-				<key>runningsubtext</key>
-				<string>Loading actions...</string>
-				<key>script</key>
-				<string>/usr/bin/python3 ha_workflow/cli.py actions "$entity_id"</string>
-				<key>scriptargtype</key>
-				<integer>1</integer>
-				<key>scriptfile</key>
-				<string></string>
-				<key>subtext</key>
-				<string></string>
-				<key>title</key>
-				<string></string>
-				<key>type</key>
-				<integer>0</integer>
-				<key>withspace</key>
-				<true/>
-			</dict>
-			<key>type</key>
-			<string>alfred.workflow.input.scriptfilter</string>
-			<key>uid</key>
-			<string>script-filter-actions</string>
-			<key>version</key>
-			<integer>3</integer>
-		</dict>
-	</array>
-
-	<!-- Connections between objects -->
-	<key>connections</key>
-	<dict>
-		<!-- Script Filter (search) -> Run Script (default action) on Enter -->
-		<key>script-filter-search</key>
-		<array>
-			<dict>
-				<key>destinationuid</key>
-				<string>run-script-action</string>
-				<key>modifiers</key>
-				<integer>0</integer>
-				<key>modifiersubtext</key>
-				<string></string>
-				<key>vitoclose</key>
-				<false/>
-			</dict>
-			<!-- Script Filter (search) -> Action sub-menu on Cmd -->
-			<dict>
-				<key>destinationuid</key>
-				<string>script-filter-actions</string>
-				<key>modifiers</key>
-				<integer>1048576</integer>
-				<key>modifiersubtext</key>
-				<string>Show available actions</string>
-				<key>vitoclose</key>
-				<false/>
-			</dict>
-		</array>
-		<!-- Run Script (action) -> Post Notification -->
-		<key>run-script-action</key>
-		<array>
-			<dict>
-				<key>destinationuid</key>
-				<string>notification-action-result</string>
-				<key>modifiers</key>
-				<integer>0</integer>
-				<key>modifiersubtext</key>
-				<string></string>
-				<key>vitoclose</key>
-				<false/>
-			</dict>
-		</array>
-		<!-- Action sub-menu -> Run Script (action) -->
-		<key>script-filter-actions</key>
-		<array>
-			<dict>
-				<key>destinationuid</key>
-				<string>run-script-action</string>
-				<key>modifiers</key>
-				<integer>0</integer>
-				<key>modifiersubtext</key>
-				<string></string>
-				<key>vitoclose</key>
-				<false/>
-			</dict>
-		</array>
-	</dict>
-
-	<!-- Object positions (for Alfred UI layout) -->
-	<key>uidata</key>
-	<dict>
-		<key>script-filter-search</key>
-		<dict>
-			<key>xpos</key>
-			<real>100</real>
-			<key>ypos</key>
-			<real>200</real>
-		</dict>
-		<key>run-script-action</key>
-		<dict>
-			<key>xpos</key>
-			<real>400</real>
-			<key>ypos</key>
-			<real>200</real>
-		</dict>
-		<key>notification-action-result</key>
-		<dict>
-			<key>xpos</key>
-			<real>700</real>
-			<key>ypos</key>
-			<real>200</real>
-		</dict>
-		<key>script-filter-actions</key>
-		<dict>
-			<key>xpos</key>
-			<real>400</real>
-			<key>ypos</key>
-			<real>400</real>
-		</dict>
-	</dict>
+	<key>version</key>
+	<string>0.1.0</string>
 </dict>
 </plist>
