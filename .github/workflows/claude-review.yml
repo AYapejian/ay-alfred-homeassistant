@@ -1,0 +1,48 @@
+name: Claude Code Review
+
+on:
+  pull_request:
+    types: [opened, reopened, ready_for_review]
+    branches: [main]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+concurrency:
+  group: claude-review-pr-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  review:
+    # Skip draft PRs and fork PRs (forks lack secrets + prompt injection risk)
+    if: >-
+      !github.event.pull_request.draft &&
+      github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          use_sticky_comment: true
+          track_progress: true
+          prompt: |
+            You are reviewing a pull request for the ay-alfred-homeassistant project.
+
+            Read .github/REVIEW.md for detailed review guidelines, then review the PR diff.
+
+            Focus on:
+            1. Python 3.9 compatibility — flag 3.10+ syntax (match, X | Y unions, except*)
+            2. Security — no hardcoded secrets/tokens/credentials; proper input validation
+            3. Type safety — consistent with mypy strict mode
+            4. Test coverage — new code should have tests
+            5. Project conventions — per CLAUDE.md
+
+            Post inline comments on specific lines for concrete issues.
+            Post a summary with overall assessment.
+            Be constructive. Don't duplicate ruff/mypy (CI handles those).
+          claude_args: "--model claude-sonnet-4-6 --max-turns 5"
