@@ -9,10 +9,10 @@
 
 | Item | Value |
 |------|-------|
-| **Current phase** | Phase 1 — Configuration & HA Client |
-| **Active branch** | `feat/phase-1-config-ha-client` |
-| **Last completed phase** | Phase 0 — Foundation & CI/Packaging |
-| **Last commit on main** | `81a8c4e` — Phase 0 merged |
+| **Current phase** | Phase 2 — Entity Cache & Search |
+| **Active branch** | — (next: `feat/phase-2-cache-search`) |
+| **Last completed phase** | Phase 1 — Configuration & HA Client |
+| **Last commit on main** | `48462ac` — Phase 1 merged |
 | **Blockers** | None |
 
 ---
@@ -36,7 +36,7 @@
 | Phase | Name | Status | Branch | Merged |
 |-------|------|--------|--------|--------|
 | 0 | Foundation & CI/Packaging | **Done** | `feat/planning-phase` | `81a8c4e` on main |
-| 1 | Configuration & HA Client | **In Progress** | `feat/phase-1-config-ha-client` | — |
+| 1 | Configuration & HA Client | **Done** | `feat/phase-1-config-ha-client` | `48462ac` on main |
 | 2 | Entity Cache & Search | Planned | — | — |
 | 3 | Actions & Entity Interaction | Planned | — | — |
 | 4 | Polish & Usability | Planned | — | — |
