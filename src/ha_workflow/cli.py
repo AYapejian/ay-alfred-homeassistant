@@ -7,11 +7,9 @@ Invoked as::
 
 from __future__ import annotations
 
-import calendar
 import os
 import subprocess
 import sys
-import time
 from typing import Any, NamedTuple, Optional
 
 # When Alfred runs ``python3 ha_workflow/cli.py …``, Python sets sys.path[0]
@@ -638,28 +636,6 @@ def _yaml_scalar(value: object) -> str:
     if any(c in _yaml_special for c in s):
         return f'"{s}"'
     return s
-
-
-def _format_relative_time(iso_timestamp: str) -> str:
-    """Convert an ISO-8601 timestamp to a human-readable relative string."""
-    if not iso_timestamp:
-        return ""
-    try:
-        clean = iso_timestamp.split(".")[0].replace("Z", "")
-        clean = clean.replace("+00:00", "")
-        ts = float(calendar.timegm(time.strptime(clean, "%Y-%m-%dT%H:%M:%S")))
-        delta = time.time() - ts
-        if delta < 0:
-            return "just now"
-        if delta < 60:
-            return f"{int(delta)}s ago"
-        if delta < 3600:
-            return f"{int(delta // 60)}m ago"
-        if delta < 86400:
-            return f"{int(delta // 3600)}h ago"
-        return f"{int(delta // 86400)}d ago"
-    except (ValueError, OverflowError):
-        return ""
 
 
 def _format_history_entry(entry: dict[str, Any]) -> str:

@@ -1507,38 +1507,6 @@ class TestFormatAsYaml:
         assert "z: false" in result
 
 
-class TestFormatRelativeTime:
-    def test_empty_string(self) -> None:
-        from ha_workflow.cli import _format_relative_time
-
-        assert _format_relative_time("") == ""
-
-    def test_invalid_timestamp(self) -> None:
-        from ha_workflow.cli import _format_relative_time
-
-        assert _format_relative_time("not-a-date") == ""
-
-    @patch("ha_workflow.cli.time.time")
-    @patch("ha_workflow.cli.calendar.timegm")
-    def test_seconds_ago(self, mock_timegm: MagicMock, mock_time: MagicMock) -> None:
-        from ha_workflow.cli import _format_relative_time
-
-        mock_timegm.return_value = 1000.0
-        mock_time.return_value = 1030.0
-        result = _format_relative_time("2026-01-01T00:00:00+00:00")
-        assert result == "30s ago"
-
-    @patch("ha_workflow.cli.time.time")
-    @patch("ha_workflow.cli.calendar.timegm")
-    def test_minutes_ago(self, mock_timegm: MagicMock, mock_time: MagicMock) -> None:
-        from ha_workflow.cli import _format_relative_time
-
-        mock_timegm.return_value = 1000.0
-        mock_time.return_value = 1000.0 + 300
-        result = _format_relative_time("2026-01-01T00:00:00+00:00")
-        assert result == "5m ago"
-
-
 class TestFormatHistoryEntry:
     def test_normal_entry(self) -> None:
         from ha_workflow.cli import _format_history_entry
