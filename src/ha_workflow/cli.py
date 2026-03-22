@@ -596,7 +596,15 @@ def _cmd_system_action(action: str) -> None:
         try:
             log_text = client.get_error_log()
         except Exception as exc:
-            notify_error(f"Failed to fetch error log: {exc}")
+            msg = str(exc)
+            if "404" in msg:
+                notify_error(
+                    "Error log not available (endpoint returned 404). "
+                    "This endpoint is not supported via Nabu Casa cloud — "
+                    "use a local HA URL instead."
+                )
+            else:
+                notify_error(f"Failed to fetch error log: {exc}")
             return
         if not log_text or not log_text.strip():
             notify("Error log is empty")
