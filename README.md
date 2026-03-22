@@ -1,5 +1,14 @@
 # ay-alfred-homeassistant
 
+[![CI](https://github.com/AYapejian/ay-alfred-homeassistant/actions/workflows/ci.yml/badge.svg)](https://github.com/AYapejian/ay-alfred-homeassistant/actions/workflows/ci.yml)
+[![Release](https://github.com/AYapejian/ay-alfred-homeassistant/actions/workflows/release.yml/badge.svg)](https://github.com/AYapejian/ay-alfred-homeassistant/actions/workflows/release.yml)
+[![GitHub Release](https://img.shields.io/github/v/release/AYapejian/ay-alfred-homeassistant?include_prereleases&sort=semver)](https://github.com/AYapejian/ay-alfred-homeassistant/releases/latest)
+[![License: MIT](https://img.shields.io/github/license/AYapejian/ay-alfred-homeassistant)](LICENSE)
+[![Python 3.9+](https://img.shields.io/badge/python-3.9%2B-blue?logo=python&logoColor=white)](https://www.python.org/)
+[![Alfred 5](https://img.shields.io/badge/Alfred-5-blueviolet?logo=alfred)](https://www.alfredapp.com/)
+[![Home Assistant](https://img.shields.io/badge/Home%20Assistant-REST%20API-41BDF5?logo=homeassistant&logoColor=white)](https://www.home-assistant.io/)
+[![Code style: ruff](https://img.shields.io/badge/code%20style-ruff-D7FF64?logo=ruff&logoColor=D7FF64)](https://docs.astral.sh/ruff/)
+
 An [Alfred](https://www.alfredapp.com/) workflow for macOS that brings [Home Assistant](https://www.home-assistant.io/) to your fingertips. Search entities, call services, toggle automations, and more — all from Alfred's search bar.
 
 > **Note:** This is an active personal project, built largely with AI-assisted development. It works well for my setup, but it is not production-grade software. APIs and behavior may change between versions. If you find it useful, great — just know what you're getting into.
