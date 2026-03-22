@@ -22,6 +22,7 @@ if _WORKFLOW_ROOT not in sys.path:
 
 import re  # noqa: E402
 
+from ha_workflow.actions import dispatch_action  # noqa: E402
 from ha_workflow.alfred import AlfredIcon, AlfredItem, AlfredOutput  # noqa: E402
 from ha_workflow.cache import EntityCache, open_cache  # noqa: E402
 from ha_workflow.config import Config  # noqa: E402
@@ -466,8 +467,17 @@ def _cmd_action(args: list[str]) -> None:
         _cmd_system_action(action)
         return
 
-    # Entity actions — Phase 3 will implement this fully
-    _cmd_stub("action")
+    if not entity_id or not action:
+        sys.stdout.write("Missing entity_id or action\n")
+        return
+
+    config = Config.from_env()
+    client = HAClient(config)
+    result = dispatch_action(client, entity_id, action)
+    sys.stdout.write(result.message + "\n")
+
+    if result.success:
+        _cmd_record_usage(entity_id)
 
 
 def _cmd_system_action(action: str) -> None:
@@ -493,6 +503,67 @@ def _cmd_system_action(action: str) -> None:
 
     else:
         sys.stdout.write(f"Unknown system action: {action}\n")
+
+
+def _cmd_actions(args: list[str]) -> None:
+    """List available actions for an entity (Cmd modifier sub-menu)."""
+    entity_id = args[0] if args else ""
+    if not entity_id:
+        output = AlfredOutput(
+            items=[AlfredItem(title="No entity selected", valid=False)]
+        )
+        sys.stdout.write(output.to_json() + "\n")
+        return
+
+    domain = entity_id.split(".")[0] if "." in entity_id else ""
+    if not domain:
+        output = AlfredOutput(
+            items=[
+                AlfredItem(
+                    title="Invalid entity ID",
+                    subtitle=entity_id,
+                    valid=False,
+                )
+            ]
+        )
+        sys.stdout.write(output.to_json() + "\n")
+        return
+
+    dc = get_domain_config(domain)
+
+    if not dc.available_actions:
+        output = AlfredOutput(
+            items=[
+                AlfredItem(
+                    title="No actions available",
+                    subtitle=f"{entity_id} is display-only",
+                    valid=False,
+                )
+            ]
+        )
+        sys.stdout.write(output.to_json() + "\n")
+        return
+
+    friendly = entity_id.split(".", 1)[1].replace("_", " ").title()
+    items: list[AlfredItem] = []
+    for action in dc.available_actions:
+        label = action.replace("_", " ").title()
+        items.append(
+            AlfredItem(
+                title=label,
+                subtitle=f"{friendly} \u00b7 {domain}",
+                icon=AlfredIcon(path=dc.icon_path),
+                variables={
+                    "entity_id": entity_id,
+                    "action": action,
+                    "domain": domain,
+                },
+                valid=True,
+            )
+        )
+
+    output = AlfredOutput(items=items)
+    sys.stdout.write(output.to_json() + "\n")
 
 
 def _cmd_record_usage(entity_id: str) -> None:
@@ -545,7 +616,7 @@ def main(argv: Optional[list[str]] = None) -> None:
     elif command == "action":
         _cmd_action(args[1:])
     elif command == "actions":
-        _cmd_stub("actions")
+        _cmd_actions(args[1:])
     elif command == "record-usage":
         entity_id = args[1] if len(args) > 1 else ""
         _cmd_record_usage(entity_id)

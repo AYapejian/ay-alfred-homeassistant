@@ -79,17 +79,30 @@ class TestCommandDispatch:
         data = json.loads(out)
         assert data["items"][0]["valid"] is False
 
-    def test_action_stub(self, capsys: object) -> None:
-        main(["action", "light.living_room", "toggle"])
-        out = capsys.readouterr().out  # type: ignore[union-attr]
-        data = json.loads(out)
-        assert "not yet implemented" in data["items"][0]["title"]
+    @patch("ha_workflow.cli._cmd_record_usage")
+    @patch("ha_workflow.cli.dispatch_action")
+    @patch("ha_workflow.cli.HAClient")
+    @patch("ha_workflow.cli.Config.from_env")
+    def test_action_dispatches(
+        self,
+        mock_from_env: MagicMock,
+        mock_ha_client: MagicMock,
+        mock_dispatch: MagicMock,
+        mock_record: MagicMock,
+        capsys: object,
+    ) -> None:
+        from ha_workflow.actions import ActionResult
 
-    def test_actions_stub(self, capsys: object) -> None:
+        mock_from_env.return_value = MagicMock()
+        mock_dispatch.return_value = ActionResult(success=True, message="Toggled")
+        main(["action", "light.living_room", "toggle"])
+        mock_dispatch.assert_called_once()
+
+    def test_actions_lists_domain_actions(self, capsys: object) -> None:
         main(["actions", "light.living_room"])
         out = capsys.readouterr().out  # type: ignore[union-attr]
         data = json.loads(out)
-        assert "not yet implemented" in data["items"][0]["title"]
+        assert any(item["title"] == "Toggle" for item in data["items"])
 
     def test_unknown_command_stub(self, capsys: object) -> None:
         main(["bogus"])
@@ -800,11 +813,107 @@ class TestActionCommand:
         out = capsys.readouterr().out  # type: ignore[union-attr]
         assert "refreshed" in out.lower()
 
-    def test_entity_action_still_stubs(self, capsys: object) -> None:
+    @patch("ha_workflow.cli._cmd_record_usage")
+    @patch("ha_workflow.cli.dispatch_action")
+    @patch("ha_workflow.cli.HAClient")
+    @patch("ha_workflow.cli.Config.from_env")
+    def test_entity_action_toggle(
+        self,
+        mock_from_env: MagicMock,
+        mock_ha_client: MagicMock,
+        mock_dispatch: MagicMock,
+        mock_record: MagicMock,
+        capsys: object,
+    ) -> None:
+        from ha_workflow.actions import ActionResult
+
+        mock_from_env.return_value = MagicMock()
+        mock_dispatch.return_value = ActionResult(
+            success=True, message="Toggled Living Room Light"
+        )
+
         main(["action", "light.living_room", "toggle"])
+
+        mock_dispatch.assert_called_once()
+        out = capsys.readouterr().out  # type: ignore[union-attr]
+        assert "Toggled Living Room Light" in out
+        mock_record.assert_called_once_with("light.living_room")
+
+    @patch("ha_workflow.cli._cmd_record_usage")
+    @patch("ha_workflow.cli.dispatch_action")
+    @patch("ha_workflow.cli.HAClient")
+    @patch("ha_workflow.cli.Config.from_env")
+    def test_entity_action_failure_no_usage(
+        self,
+        mock_from_env: MagicMock,
+        mock_ha_client: MagicMock,
+        mock_dispatch: MagicMock,
+        mock_record: MagicMock,
+        capsys: object,
+    ) -> None:
+        from ha_workflow.actions import ActionResult
+
+        mock_from_env.return_value = MagicMock()
+        mock_dispatch.return_value = ActionResult(
+            success=False, message="Connection error: timeout"
+        )
+
+        main(["action", "light.living_room", "toggle"])
+
+        out = capsys.readouterr().out  # type: ignore[union-attr]
+        assert "Connection error" in out
+        mock_record.assert_not_called()
+
+    def test_entity_action_missing_args(self, capsys: object) -> None:
+        main(["action", "light.living_room"])
+        out = capsys.readouterr().out  # type: ignore[union-attr]
+        assert "Missing" in out
+
+
+class TestActionsCommand:
+    def test_actions_for_light(self, capsys: object) -> None:
+        main(["actions", "light.living_room"])
         out = capsys.readouterr().out  # type: ignore[union-attr]
         data = json.loads(out)
-        assert "not yet implemented" in data["items"][0]["title"]
+        titles = [item["title"] for item in data["items"]]
+        assert "Toggle" in titles
+        assert "Turn On" in titles
+        assert "Turn Off" in titles
+        # Each item should have correct variables
+        for item in data["items"]:
+            assert item["variables"]["entity_id"] == "light.living_room"
+            assert item["variables"]["domain"] == "light"
+            assert "action" in item["variables"]
+
+    def test_actions_for_cover(self, capsys: object) -> None:
+        main(["actions", "cover.garage"])
+        out = capsys.readouterr().out  # type: ignore[union-attr]
+        data = json.loads(out)
+        titles = [item["title"] for item in data["items"]]
+        assert "Open Cover" in titles
+        assert "Close Cover" in titles
+        assert "Stop Cover" in titles
+
+    def test_actions_display_only(self, capsys: object) -> None:
+        main(["actions", "sensor.temperature"])
+        out = capsys.readouterr().out  # type: ignore[union-attr]
+        data = json.loads(out)
+        assert len(data["items"]) == 1
+        assert "No actions" in data["items"][0]["title"]
+        assert data["items"][0]["valid"] is False
+
+    def test_actions_no_entity(self, capsys: object) -> None:
+        main(["actions"])
+        out = capsys.readouterr().out  # type: ignore[union-attr]
+        data = json.loads(out)
+        assert "No entity" in data["items"][0]["title"]
+
+    def test_actions_malformed_entity_id(self, capsys: object) -> None:
+        main(["actions", "badentity"])
+        out = capsys.readouterr().out  # type: ignore[union-attr]
+        data = json.loads(out)
+        assert "Invalid entity ID" in data["items"][0]["title"]
+        assert data["items"][0]["valid"] is False
 
 
 # ---------------------------------------------------------------------------
