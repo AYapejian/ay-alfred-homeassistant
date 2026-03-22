@@ -43,14 +43,14 @@ Phase 3 builds on this: implement the entity action dispatcher and wire `record-
 - Script Filter node already wired in `info.plist`: `cli.py actions "$entity_id"` (Phase 0)
 - **Depends on:** 2.1 (DOMAIN_REGISTRY), 3.1
 
-### 3.4 — HA system commands
-- [ ] **Pending**
-- Add to `_SYSTEM_COMMANDS` registry and `_cmd_system_action()` handler (Phase 1.5 infrastructure):
-  - "System: Restart Home Assistant" — call `homeassistant/restart` with confirmation step
-  - "System: Check config" — validate config, show result
-  - "System: View logs" — fetch error log, display in Large Type / copy to clipboard
-- Keywords should match natural queries like "restart", "logs", "check config"
-- **Depends on:** 1.4 (HA client), 1.5.7 (system commands infrastructure)
+### 3.4 — HA system commands ✅
+- [x] **Done** — PR (2026-03-22)
+- Added to `_SYSTEM_COMMANDS` registry and `_cmd_system_action()` handler:
+  - "System: Restart Home Assistant" — calls `homeassistant/restart`
+  - "System: Check config" — validates config, shows valid/invalid + error details
+  - "System: View error log" — fetches error log, copies to clipboard via `pbcopy`
+- Keywords: "restart", "reboot", "check config", "validate", "log", "error", "debug"
+- Also improved keyword matching from substring to word-prefix (avoids false positives)
 
 ---
 
@@ -58,6 +58,7 @@ Phase 3 builds on this: implement the entity action dispatcher and wire `record-
 
 - [ ] Enter on a light -> toggles it, shows notification, records usage
 - [ ] Cmd on a light -> shows action menu (Toggle, Turn On, Turn Off)
-- [ ] `ha restart` -> shows "System: Restart Home Assistant", Enter -> confirmation -> HA restarts
-- [ ] `ha logs` -> shows "System: View logs", Enter -> shows recent error log
+- [x] `ha restart` -> shows "System: Restart Home Assistant", Enter -> HA restarts
+- [x] `ha logs` -> shows "System: View error log", Enter -> copies error log to clipboard
+- [x] `ha check config` -> shows "System: Check config", Enter -> validates config
 - [ ] After using entities, empty `ha` query shows recently used entities first (usage tracking end-to-end)

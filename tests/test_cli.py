@@ -927,6 +927,271 @@ class TestActionCommand:
         out = capsys.readouterr().out  # type: ignore[union-attr]
         assert "Missing" in out
 
+    @patch("ha_workflow.cli.HAClient")
+    @patch("ha_workflow.cli.Config.from_env")
+    def test_system_action_ha_restart(
+        self,
+        mock_from_env: MagicMock,
+        mock_ha_client: MagicMock,
+        capsys: object,
+    ) -> None:
+        mock_from_env.return_value = MagicMock()
+        mock_client = MagicMock()
+        mock_ha_client.return_value = mock_client
+
+        main(["action", "__system__", "ha_restart"])
+
+        mock_client.call_service.assert_called_once_with("homeassistant", "restart")
+        out = capsys.readouterr().out  # type: ignore[union-attr]
+        assert "restarting" in out.lower()
+
+    @patch("ha_workflow.cli.HAClient")
+    @patch("ha_workflow.cli.Config.from_env")
+    def test_system_action_ha_restart_failure(
+        self,
+        mock_from_env: MagicMock,
+        mock_ha_client: MagicMock,
+        capsys: object,
+    ) -> None:
+        from ha_workflow.errors import HAConnectionError
+
+        mock_from_env.return_value = MagicMock()
+        mock_client = MagicMock()
+        mock_client.call_service.side_effect = HAConnectionError("timeout")
+        mock_ha_client.return_value = mock_client
+
+        main(["action", "__system__", "ha_restart"])
+
+        out = capsys.readouterr().out  # type: ignore[union-attr]
+        assert "failed" in out.lower()
+
+    @patch("ha_workflow.cli.HAClient")
+    @patch("ha_workflow.cli.Config.from_env")
+    def test_system_action_ha_check_config_valid(
+        self,
+        mock_from_env: MagicMock,
+        mock_ha_client: MagicMock,
+        capsys: object,
+    ) -> None:
+        mock_from_env.return_value = MagicMock()
+        mock_client = MagicMock()
+        mock_client.check_config.return_value = {"result": "valid", "errors": None}
+        mock_ha_client.return_value = mock_client
+
+        main(["action", "__system__", "ha_check_config"])
+
+        out = capsys.readouterr().out  # type: ignore[union-attr]
+        assert "valid" in out.lower()
+
+    @patch("ha_workflow.cli.HAClient")
+    @patch("ha_workflow.cli.Config.from_env")
+    def test_system_action_ha_check_config_invalid(
+        self,
+        mock_from_env: MagicMock,
+        mock_ha_client: MagicMock,
+        capsys: object,
+    ) -> None:
+        mock_from_env.return_value = MagicMock()
+        mock_client = MagicMock()
+        mock_client.check_config.return_value = {
+            "result": "invalid",
+            "errors": "Integration 'foo' not found",
+        }
+        mock_ha_client.return_value = mock_client
+
+        main(["action", "__system__", "ha_check_config"])
+
+        out = capsys.readouterr().out  # type: ignore[union-attr]
+        assert "invalid" in out.lower()
+        assert "foo" in out
+
+    @patch("ha_workflow.cli.HAClient")
+    @patch("ha_workflow.cli.Config.from_env")
+    def test_system_action_ha_check_config_failure(
+        self,
+        mock_from_env: MagicMock,
+        mock_ha_client: MagicMock,
+        capsys: object,
+    ) -> None:
+        from ha_workflow.errors import HAConnectionError
+
+        mock_from_env.return_value = MagicMock()
+        mock_client = MagicMock()
+        mock_client.check_config.side_effect = HAConnectionError("timeout")
+        mock_ha_client.return_value = mock_client
+
+        main(["action", "__system__", "ha_check_config"])
+
+        out = capsys.readouterr().out  # type: ignore[union-attr]
+        assert "failed" in out.lower()
+
+    @patch("ha_workflow.cli.subprocess.run")
+    @patch("ha_workflow.cli.HAClient")
+    @patch("ha_workflow.cli.Config.from_env")
+    def test_system_action_ha_error_log(
+        self,
+        mock_from_env: MagicMock,
+        mock_ha_client: MagicMock,
+        mock_run: MagicMock,
+        capsys: object,
+    ) -> None:
+        mock_from_env.return_value = MagicMock()
+        mock_client = MagicMock()
+        mock_client.get_error_log.return_value = (
+            "2026-03-22 ERROR (MainThread) [homeassistant] Something broke\n"
+            "2026-03-22 WARNING (MainThread) [custom] Another issue\n"
+        )
+        mock_ha_client.return_value = mock_client
+
+        main(["action", "__system__", "ha_error_log"])
+
+        mock_run.assert_called_once()
+        call_args = mock_run.call_args
+        assert call_args[0][0] == ["pbcopy"]
+        assert b"Something broke" in call_args[1]["input"]
+        out = capsys.readouterr().out  # type: ignore[union-attr]
+        assert "copied to clipboard" in out.lower()
+        assert "2 lines" in out
+
+    @patch("ha_workflow.cli.HAClient")
+    @patch("ha_workflow.cli.Config.from_env")
+    def test_system_action_ha_error_log_empty(
+        self,
+        mock_from_env: MagicMock,
+        mock_ha_client: MagicMock,
+        capsys: object,
+    ) -> None:
+        mock_from_env.return_value = MagicMock()
+        mock_client = MagicMock()
+        mock_client.get_error_log.return_value = ""
+        mock_ha_client.return_value = mock_client
+
+        main(["action", "__system__", "ha_error_log"])
+
+        out = capsys.readouterr().out  # type: ignore[union-attr]
+        assert "empty" in out.lower()
+
+    @patch("ha_workflow.cli.HAClient")
+    @patch("ha_workflow.cli.Config.from_env")
+    def test_system_action_ha_error_log_failure(
+        self,
+        mock_from_env: MagicMock,
+        mock_ha_client: MagicMock,
+        capsys: object,
+    ) -> None:
+        from ha_workflow.errors import HAConnectionError
+
+        mock_from_env.return_value = MagicMock()
+        mock_client = MagicMock()
+        mock_client.get_error_log.side_effect = HAConnectionError("timeout")
+        mock_ha_client.return_value = mock_client
+
+        main(["action", "__system__", "ha_error_log"])
+
+        out = capsys.readouterr().out  # type: ignore[union-attr]
+        assert "failed" in out.lower()
+
+
+class TestSystemCommandsSearch:
+    """Test that new system commands surface in search results."""
+
+    @patch("ha_workflow.cli.open_usage_tracker")
+    @patch("ha_workflow.cli._maybe_refresh_background")
+    @patch("ha_workflow.cli.open_cache")
+    @patch("ha_workflow.cli.Config.from_env")
+    def test_restart_surfaces_in_search(
+        self,
+        mock_from_env: MagicMock,
+        mock_open_cache: MagicMock,
+        mock_bg_refresh: MagicMock,
+        mock_open_tracker: MagicMock,
+        capsys: object,
+    ) -> None:
+        mock_from_env.return_value = MagicMock(cache_ttl=60)
+        mock_open_cache.return_value = _mock_cache()
+        mock_open_tracker.return_value = _mock_tracker()
+
+        main(["search", "restart"])
+
+        out = capsys.readouterr().out  # type: ignore[union-attr]
+        data = json.loads(out)
+        titles = [i["title"] for i in data["items"]]
+        assert "System: Restart Home Assistant" in titles
+
+    @patch("ha_workflow.cli.open_usage_tracker")
+    @patch("ha_workflow.cli._maybe_refresh_background")
+    @patch("ha_workflow.cli.open_cache")
+    @patch("ha_workflow.cli.Config.from_env")
+    def test_check_config_surfaces_in_search(
+        self,
+        mock_from_env: MagicMock,
+        mock_open_cache: MagicMock,
+        mock_bg_refresh: MagicMock,
+        mock_open_tracker: MagicMock,
+        capsys: object,
+    ) -> None:
+        mock_from_env.return_value = MagicMock(cache_ttl=60)
+        mock_open_cache.return_value = _mock_cache()
+        mock_open_tracker.return_value = _mock_tracker()
+
+        main(["search", "check config"])
+
+        out = capsys.readouterr().out  # type: ignore[union-attr]
+        data = json.loads(out)
+        titles = [i["title"] for i in data["items"]]
+        assert "System: Check config" in titles
+
+    @patch("ha_workflow.cli.open_usage_tracker")
+    @patch("ha_workflow.cli._maybe_refresh_background")
+    @patch("ha_workflow.cli.open_cache")
+    @patch("ha_workflow.cli.Config.from_env")
+    def test_logs_surfaces_in_search(
+        self,
+        mock_from_env: MagicMock,
+        mock_open_cache: MagicMock,
+        mock_bg_refresh: MagicMock,
+        mock_open_tracker: MagicMock,
+        capsys: object,
+    ) -> None:
+        mock_from_env.return_value = MagicMock(cache_ttl=60)
+        mock_open_cache.return_value = _mock_cache()
+        mock_open_tracker.return_value = _mock_tracker()
+
+        main(["search", "error log"])
+
+        out = capsys.readouterr().out  # type: ignore[union-attr]
+        data = json.loads(out)
+        titles = [i["title"] for i in data["items"]]
+        assert "System: View error log" in titles
+
+    @patch("ha_workflow.cli.open_usage_tracker")
+    @patch("ha_workflow.cli._maybe_refresh_background")
+    @patch("ha_workflow.cli.open_cache")
+    @patch("ha_workflow.cli.Config.from_env")
+    def test_all_system_commands_on_empty_query(
+        self,
+        mock_from_env: MagicMock,
+        mock_open_cache: MagicMock,
+        mock_bg_refresh: MagicMock,
+        mock_open_tracker: MagicMock,
+        capsys: object,
+    ) -> None:
+        mock_from_env.return_value = MagicMock(cache_ttl=60)
+        mock_open_cache.return_value = _mock_cache()
+        mock_open_tracker.return_value = _mock_tracker()
+
+        main(["search"])
+
+        out = capsys.readouterr().out  # type: ignore[union-attr]
+        data = json.loads(out)
+        sys_items = [
+            i
+            for i in data["items"]
+            if i.get("variables", {}).get("domain") == "__system__"
+        ]
+        # Should have all 5 system commands
+        assert len(sys_items) == 5
+
 
 class TestActionsCommand:
     def test_actions_for_light(self, capsys: object) -> None:

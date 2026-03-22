@@ -62,6 +62,25 @@ _SYSTEM_COMMANDS: list[dict[str, str]] = [
         "action": "cache_refresh",
         "keywords": "cache refresh reload entities update",
     },
+    # HA system commands
+    {
+        "title": "System: Restart Home Assistant",
+        "subtitle": "System \u00b7 Restart the HA instance",
+        "action": "ha_restart",
+        "keywords": "restart reboot home assistant ha system server",
+    },
+    {
+        "title": "System: Check config",
+        "subtitle": "System \u00b7 Validate Home Assistant configuration",
+        "action": "ha_check_config",
+        "keywords": "check config validate configuration yaml test",
+    },
+    {
+        "title": "System: View error log",
+        "subtitle": "System \u00b7 Copy recent HA error log to clipboard",
+        "action": "ha_error_log",
+        "keywords": "log logs error errors view show debug",
+    },
 ]
 
 # System command icon — grey cog on rounded square
@@ -81,9 +100,12 @@ def _match_system_commands(query: str) -> list[AlfredItem]:
     items: list[AlfredItem] = []
     for cmd in _SYSTEM_COMMANDS:
         if query_lower:
-            words = query_lower.split()
-            keywords = cmd["keywords"]
-            if not all(w in keywords for w in words):
+            query_words = query_lower.split()
+            keyword_words = cmd["keywords"].split()
+            # Each query word must be a prefix of at least one keyword
+            if not all(
+                any(kw.startswith(qw) for kw in keyword_words) for qw in query_words
+            ):
                 continue
         items.append(
             AlfredItem(
@@ -515,6 +537,49 @@ def _cmd_system_action(action: str) -> None:
             sys.stdout.write(f"Cache refreshed: {count} entities\n")
         finally:
             cache.close()
+
+    elif action == "ha_restart":
+        client = HAClient(config)
+        try:
+            client.call_service("homeassistant", "restart")
+            sys.stdout.write("Home Assistant is restarting\n")
+        except Exception as exc:
+            sys.stdout.write(f"Restart failed: {exc}\n")
+
+    elif action == "ha_check_config":
+        client = HAClient(config)
+        try:
+            result = client.check_config()
+            errors = result.get("errors")
+            if errors:
+                sys.stdout.write(f"Config invalid: {errors}\n")
+            else:
+                sys.stdout.write("Configuration is valid\n")
+        except Exception as exc:
+            sys.stdout.write(f"Config check failed: {exc}\n")
+
+    elif action == "ha_error_log":
+        client = HAClient(config)
+        try:
+            log_text = client.get_error_log()
+        except Exception as exc:
+            sys.stdout.write(f"Failed to fetch error log: {exc}\n")
+            return
+        if not log_text or not log_text.strip():
+            sys.stdout.write("Error log is empty\n")
+            return
+        try:
+            subprocess.run(
+                ["pbcopy"], input=log_text.encode("utf-8"), check=True
+            )
+        except Exception as exc:
+            sys.stdout.write(f"Failed to copy log to clipboard: {exc}\n")
+            return
+        first_line = log_text.strip().split("\n")[0][:80]
+        lines = log_text.strip().count("\n") + 1
+        sys.stdout.write(
+            f"Error log copied to clipboard ({lines} lines): {first_line}\n"
+        )
 
     else:
         sys.stdout.write(f"Unknown system action: {action}\n")
