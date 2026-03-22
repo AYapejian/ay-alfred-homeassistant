@@ -19,6 +19,7 @@ def _entity(
     entity_id: str = "light.living_room",
     state: str = "on",
     friendly_name: str = "Living Room Light",
+    area_name: str = "",
     **extra_attrs: Any,
 ) -> Entity:
     domain = entity_id.split(".", 1)[0]
@@ -31,6 +32,7 @@ def _entity(
         attributes=attrs,
         last_changed="",
         last_updated="",
+        area_name=area_name,
     )
 
 
@@ -303,6 +305,65 @@ class TestSearchCommand:
         data = json.loads(out)
         item = data["items"][0]
         assert "switch" in item["subtitle"]
+
+    @patch("ha_workflow.cli.open_usage_tracker")
+    @patch("ha_workflow.cli._maybe_refresh_background")
+    @patch("ha_workflow.cli.open_cache")
+    @patch("ha_workflow.cli.Config.from_env")
+    def test_search_items_show_area_in_subtitle(
+        self,
+        mock_from_env: MagicMock,
+        mock_open_cache: MagicMock,
+        mock_bg_refresh: MagicMock,
+        mock_open_tracker: MagicMock,
+        capsys: object,
+    ) -> None:
+        entities = [
+            _entity(
+                "light.living_room",
+                "on",
+                "Living Room Light",
+                area_name="Living Room",
+            ),
+        ]
+        mock_from_env.return_value = MagicMock(cache_ttl=60)
+        mock_open_cache.return_value = _mock_cache(entities=entities)
+        mock_open_tracker.return_value = _mock_tracker()
+
+        main(["search", "living"])
+
+        out = capsys.readouterr().out  # type: ignore[union-attr]
+        data = json.loads(out)
+        item = data["items"][0]
+        assert "Living Room" in item["subtitle"]
+        # Should NOT contain domain as prefix when area is present
+        assert not item["subtitle"].startswith("light")
+
+    @patch("ha_workflow.cli.open_usage_tracker")
+    @patch("ha_workflow.cli._maybe_refresh_background")
+    @patch("ha_workflow.cli.open_cache")
+    @patch("ha_workflow.cli.Config.from_env")
+    def test_search_items_fall_back_to_domain_without_area(
+        self,
+        mock_from_env: MagicMock,
+        mock_open_cache: MagicMock,
+        mock_bg_refresh: MagicMock,
+        mock_open_tracker: MagicMock,
+        capsys: object,
+    ) -> None:
+        entities = [
+            _entity("switch.kitchen", "off", "Kitchen Switch"),
+        ]
+        mock_from_env.return_value = MagicMock(cache_ttl=60)
+        mock_open_cache.return_value = _mock_cache(entities=entities)
+        mock_open_tracker.return_value = _mock_tracker()
+
+        main(["search", "kitchen"])
+
+        out = capsys.readouterr().out  # type: ignore[union-attr]
+        data = json.loads(out)
+        item = data["items"][0]
+        assert item["subtitle"].startswith("switch")
 
 
 # ---------------------------------------------------------------------------
@@ -744,3 +805,55 @@ class TestActionCommand:
         out = capsys.readouterr().out  # type: ignore[union-attr]
         data = json.loads(out)
         assert "not yet implemented" in data["items"][0]["title"]
+
+
+# ---------------------------------------------------------------------------
+# Area lookup
+# ---------------------------------------------------------------------------
+
+
+class TestBuildAreaLookup:
+    def test_builds_lookup_from_registries(self) -> None:
+        from ha_workflow.cli import _build_area_lookup
+
+        client = MagicMock()
+        client.get_area_registry.return_value = [
+            {"area_id": "living_room", "name": "Living Room"},
+            {"area_id": "kitchen", "name": "Kitchen"},
+        ]
+        client.get_entity_registry.return_value = [
+            {"entity_id": "light.living_room", "area_id": "living_room"},
+            {"entity_id": "switch.kitchen", "area_id": "kitchen"},
+            {"entity_id": "sensor.temp", "area_id": ""},
+        ]
+
+        lookup = _build_area_lookup(client)
+
+        assert lookup == {
+            "light.living_room": "Living Room",
+            "switch.kitchen": "Kitchen",
+        }
+        # Entity with empty area_id should not appear
+        assert "sensor.temp" not in lookup
+
+    def test_empty_registries_returns_empty(self) -> None:
+        from ha_workflow.cli import _build_area_lookup
+
+        client = MagicMock()
+        client.get_area_registry.return_value = []
+        client.get_entity_registry.return_value = []
+
+        assert _build_area_lookup(client) == {}
+
+    def test_unknown_area_id_skipped(self) -> None:
+        from ha_workflow.cli import _build_area_lookup
+
+        client = MagicMock()
+        client.get_area_registry.return_value = [
+            {"area_id": "living_room", "name": "Living Room"},
+        ]
+        client.get_entity_registry.return_value = [
+            {"entity_id": "light.x", "area_id": "nonexistent"},
+        ]
+
+        assert _build_area_lookup(client) == {}

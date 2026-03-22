@@ -99,6 +99,36 @@ class HAClient:
         assert isinstance(result, str)
         return result
 
+    def get_entity_registry(self) -> list[dict[str, Any]]:
+        """``GET /api/config/entity_registry`` — entity registry entries.
+
+        Returns a list of dicts with ``entity_id``, ``area_id``, etc.
+        Requires HA 2022.6+.  Returns an empty list on failure so callers
+        can degrade gracefully.
+        """
+        try:
+            result = self._request("GET", "/api/config/entity_registry")
+            if isinstance(result, list):
+                return result
+        except (HAConnectionError, HAAuthError):
+            pass
+        return []
+
+    def get_area_registry(self) -> list[dict[str, Any]]:
+        """``GET /api/config/area_registry`` — area registry entries.
+
+        Returns a list of dicts with ``area_id``, ``name``, etc.
+        Requires HA 2022.6+.  Returns an empty list on failure so callers
+        can degrade gracefully.
+        """
+        try:
+            result = self._request("GET", "/api/config/area_registry")
+            if isinstance(result, list):
+                return result
+        except (HAConnectionError, HAAuthError):
+            pass
+        return []
+
     def check_config(self) -> dict[str, Any]:
         """``POST /api/config/core/check_config``."""
         result = self._request("POST", "/api/config/core/check_config")
