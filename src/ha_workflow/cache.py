@@ -53,7 +53,8 @@ class EntityCache:
             );
             """
         )
-        # Migrate existing databases that lack the area_name column.
+        # Migrate pre-existing databases that lack the area_name column.
+        # For fresh databases the column already exists, so the probe is a no-op.
         try:
             self._conn.execute("SELECT area_name FROM entities LIMIT 1")
         except sqlite3.OperationalError:
@@ -168,7 +169,7 @@ class EntityCache:
             attributes=json.loads(row[4]),
             last_changed=row[5],
             last_updated=row[6],
-            area_name=row[7] if len(row) > 7 else "",
+            area_name=row[7],
         )
 
 

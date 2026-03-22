@@ -111,23 +111,27 @@ def _dbg(msg: str) -> None:
 
 def _build_area_lookup(client: HAClient) -> dict[str, str]:
     """Fetch entity + area registries and return ``{entity_id: area_name}``."""
-    areas = client.get_area_registry()
-    area_names: dict[str, str] = {}
-    for area in areas:
-        aid = area.get("area_id", "")
-        name = area.get("name", "")
-        if aid and name:
-            area_names[aid] = name
+    try:
+        areas = client.get_area_registry()
+        area_names: dict[str, str] = {}
+        for area in areas:
+            aid = area.get("area_id", "")
+            name = area.get("name", "")
+            if aid and name:
+                area_names[aid] = name
 
-    entity_reg = client.get_entity_registry()
-    lookup: dict[str, str] = {}
-    for entry in entity_reg:
-        eid = entry.get("entity_id", "")
-        aid = entry.get("area_id", "")
-        if eid and aid and aid in area_names:
-            lookup[eid] = area_names[aid]
+        entity_reg = client.get_entity_registry()
+        lookup: dict[str, str] = {}
+        for entry in entity_reg:
+            eid = entry.get("entity_id", "")
+            aid = entry.get("area_id", "")
+            if eid and aid and aid in area_names:
+                lookup[eid] = area_names[aid]
 
-    return lookup
+        return lookup
+    except Exception:
+        _dbg("_build_area_lookup: failed, returning empty lookup")
+        return {}
 
 
 def _refresh_cache(config: Config, cache: EntityCache) -> None:
