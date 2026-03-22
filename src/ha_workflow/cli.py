@@ -7,9 +7,11 @@ Invoked as::
 
 from __future__ import annotations
 
+import calendar
 import os
 import subprocess
 import sys
+import time
 from typing import Any, NamedTuple, Optional
 
 # When Alfred runs ``python3 ha_workflow/cli.py …``, Python sets sys.path[0]
@@ -42,6 +44,7 @@ from ha_workflow.usage import UsageRecord, open_usage_tracker  # noqa: E402
 _LOCK_FILENAME = ".refresh.lock"
 _DEBUG = os.environ.get("HA_DEBUG", "")
 _SYSTEM_ENTITY = "__system__"
+_YAML_SPECIAL_CHARS = frozenset(":#[]{},&*!|>")
 
 # ---------------------------------------------------------------------------
 # System commands — surfaced as search results, executed via action handler
@@ -516,6 +519,14 @@ def _cmd_action(args: list[str]) -> None:
         _cmd_view_history(entity_id)
         return
 
+    # Route copy/open actions to their dedicated handlers
+    if action.startswith("copy_"):
+        _cmd_copy_action(entity_id, action)
+        return
+    if action.startswith("open_"):
+        _cmd_open_action(entity_id, action)
+        return
+
     config = Config.from_env()
     client = HAClient(config)
     result = dispatch_action(client, entity_id, action)
@@ -577,9 +588,7 @@ def _cmd_system_action(action: str) -> None:
             sys.stdout.write("Error log is empty\n")
             return
         try:
-            subprocess.run(
-                ["pbcopy"], input=log_text.encode("utf-8"), check=True
-            )
+            subprocess.run(["pbcopy"], input=log_text.encode("utf-8"), check=True)
         except Exception as exc:
             sys.stdout.write(f"Failed to copy log to clipboard: {exc}\n")
             return
@@ -632,8 +641,7 @@ def _yaml_scalar(value: object) -> str:
     if isinstance(value, (int, float)):
         return str(value)
     s = str(value)
-    _yaml_special = set(":#[]{},&*!|>")
-    if any(c in _yaml_special for c in s):
+    if any(c in _YAML_SPECIAL_CHARS for c in s):
         return f'"{s}"'
     return s
 
@@ -645,6 +653,156 @@ def _format_history_entry(entry: dict[str, Any]) -> str:
     # Extract time portion from ISO timestamp
     time_part = changed.split("T")[1].split(".")[0] if "T" in changed else changed
     return f"{time_part}  {state}"
+
+
+def _get_cached_entity(config: Config, entity_id: str) -> Optional[Entity]:
+    """Look up an entity from the cache by ID. Returns ``None`` if not found."""
+    cache = open_cache(config)
+    try:
+        for e in cache.get_all():
+            if e.entity_id == entity_id:
+                return e
+        return None
+    finally:
+        cache.close()
+
+
+def _format_relative_time(iso_timestamp: str) -> str:
+    """Convert an ISO-8601 timestamp to a human-readable relative string."""
+    if not iso_timestamp:
+        return ""
+    try:
+        # HA timestamps: "2024-03-21T10:30:00.123456+00:00"
+        clean = iso_timestamp.split(".")[0].replace("Z", "").replace("+00:00", "")
+        # calendar.timegm interprets struct_time as UTC (unlike time.mktime)
+        ts = float(calendar.timegm(time.strptime(clean, "%Y-%m-%dT%H:%M:%S")))
+        delta = time.time() - ts
+        if delta < 0:
+            return "just now"
+        if delta < 60:
+            return f"{int(delta)}s ago"
+        if delta < 3600:
+            return f"{int(delta // 60)}m ago"
+        if delta < 86400:
+            return f"{int(delta // 3600)}h ago"
+        return f"{int(delta // 86400)}d ago"
+    except (ValueError, OverflowError):
+        return ""
+
+
+# ---------------------------------------------------------------------------
+# Copy / Open action handlers
+# ---------------------------------------------------------------------------
+
+
+def _cmd_copy_action(entity_id: str, action: str) -> None:
+    """Handle copy-to-clipboard actions."""
+    config = Config.from_env()
+
+    if action == "copy_entity_id":
+        text = entity_id
+        msg = f"Copied: {entity_id}"
+    elif action == "copy_entity_details":
+        client = HAClient(config)
+        state = client.get_state(entity_id)
+        text = _format_as_yaml(state)
+        friendly = state.get("attributes", {}).get("friendly_name", entity_id)
+        msg = f"Copied details for {friendly}"
+    elif action == "copy_device_details":
+        client = HAClient(config)
+        device_id = _lookup_device_id(client, entity_id)
+        if not device_id:
+            sys.stdout.write(f"No device found for {entity_id}\n")
+            return
+        device = _lookup_device(client, device_id)
+        if not device:
+            sys.stdout.write(f"Device {device_id} not found\n")
+            return
+        text = _format_as_yaml(device)
+        msg = f"Copied device details for {entity_id}"
+    else:
+        sys.stdout.write(f"Unknown copy action: {action}\n")
+        return
+
+    try:
+        subprocess.run(["pbcopy"], input=text.encode("utf-8"), check=True)
+    except Exception as exc:
+        sys.stdout.write(f"Failed to copy to clipboard: {exc}\n")
+        return
+    sys.stdout.write(msg + "\n")
+
+
+def _cmd_open_action(entity_id: str, action: str) -> None:
+    """Handle open-in-Home-Assistant actions."""
+    import urllib.parse
+
+    config = Config.from_env()
+    ha_url = config.ha_url
+    safe_id = urllib.parse.quote(entity_id, safe="")
+
+    if action == "open_entity":
+        url = f"{ha_url}/config/entities?filter={safe_id}"
+    elif action == "open_device":
+        client = HAClient(config)
+        device_id = _lookup_device_id(client, entity_id)
+        if not device_id:
+            sys.stdout.write(f"No device found for {entity_id}\n")
+            return
+        url = f"{ha_url}/config/devices/device/{device_id}"
+    elif action == "open_area":
+        client = HAClient(config)
+        area_id = _lookup_area_id(client, entity_id)
+        if not area_id:
+            sys.stdout.write(f"No area found for {entity_id}\n")
+            return
+        url = f"{ha_url}/config/areas/area/{area_id}"
+    elif action == "open_history":
+        url = f"{ha_url}/history?entity_id={safe_id}"
+    else:
+        sys.stdout.write(f"Unknown open action: {action}\n")
+        return
+
+    try:
+        subprocess.run(["open", url], check=True)
+    except Exception as exc:
+        sys.stdout.write(f"Failed to open in browser: {exc}\n")
+        return
+    sys.stdout.write("Opened in Home Assistant\n")
+
+
+def _lookup_device_id(client: HAClient, entity_id: str) -> str:
+    """Look up the device_id for *entity_id* from the entity registry."""
+    for entry in client.get_entity_registry():
+        if entry.get("entity_id") == entity_id:
+            return entry.get("device_id") or ""
+    return ""
+
+
+def _lookup_device(client: HAClient, device_id: str) -> Optional[dict[str, Any]]:
+    """Look up a device dict from the device registry by ID."""
+    for dev in client.get_device_registry():
+        if dev.get("id") == device_id:
+            return dev
+    return None
+
+
+def _lookup_area_id(client: HAClient, entity_id: str) -> str:
+    """Look up the area_id for *entity_id*, falling back to the device's area."""
+    entity_reg = client.get_entity_registry()
+    device_id = ""
+    area_id = ""
+    for entry in entity_reg:
+        if entry.get("entity_id") == entity_id:
+            area_id = entry.get("area_id") or ""
+            device_id = entry.get("device_id") or ""
+            break
+    if area_id:
+        return area_id
+    if device_id:
+        for dev in client.get_device_registry():
+            if dev.get("id") == device_id:
+                return dev.get("area_id") or ""
+    return ""
 
 
 def _cmd_show_details(entity_id: str) -> None:
@@ -682,7 +840,11 @@ def _cmd_view_history(entity_id: str) -> None:
 
 
 def _cmd_actions(args: list[str]) -> None:
-    """List available actions for an entity (Cmd modifier sub-menu)."""
+    """List available actions for an entity (Cmd modifier sub-menu).
+
+    Shows: entity header, domain actions, copy actions, open-in-HA actions,
+    and an advanced action call stub.
+    """
     entity_id = args[0] if args else ""
     if not entity_id:
         output = AlfredOutput(
@@ -707,21 +869,39 @@ def _cmd_actions(args: list[str]) -> None:
 
     dc = get_domain_config(domain)
 
-    if not dc.available_actions:
-        output = AlfredOutput(
-            items=[
-                AlfredItem(
-                    title="No actions available",
-                    subtitle=f"{entity_id} is display-only",
-                    valid=False,
-                )
-            ]
-        )
-        sys.stdout.write(output.to_json() + "\n")
-        return
+    # Fetch entity from cache for header info
+    try:
+        config = Config.from_env()
+        entity = _get_cached_entity(config, entity_id)
+    except Exception:
+        entity = None
 
-    friendly = entity_id.split(".", 1)[1].replace("_", " ").title()
+    friendly = (
+        entity.friendly_name
+        if entity
+        else (entity_id.split(".", 1)[1].replace("_", " ").title())
+    )
+    last_changed = entity.last_changed if entity else ""
+    area_name = entity.area_name if entity else ""
+    device_id = entity.device_id if entity else ""
+
     items: list[AlfredItem] = []
+
+    # --- Header item (not actionable) ---
+    header_subtitle = entity_id
+    relative = _format_relative_time(last_changed)
+    if relative:
+        header_subtitle += f" \u00b7 Changed {relative}"
+    items.append(
+        AlfredItem(
+            title=friendly,
+            subtitle=header_subtitle,
+            icon=AlfredIcon(path=dc.icon_path),
+            valid=False,
+        )
+    )
+
+    # --- Domain actions ---
     for action in dc.available_actions:
         label = action.replace("_", " ").title()
         items.append(
@@ -737,6 +917,118 @@ def _cmd_actions(args: list[str]) -> None:
                 valid=True,
             )
         )
+
+    # --- Copy actions ---
+    items.append(
+        AlfredItem(
+            title="Copy Entity ID",
+            subtitle=entity_id,
+            icon=_SYSTEM_ICON,
+            variables={
+                "entity_id": entity_id,
+                "action": "copy_entity_id",
+                "domain": domain,
+            },
+            valid=True,
+        )
+    )
+    items.append(
+        AlfredItem(
+            title="Copy Entity Details",
+            subtitle="Full entity state as YAML",
+            icon=_SYSTEM_ICON,
+            variables={
+                "entity_id": entity_id,
+                "action": "copy_entity_details",
+                "domain": domain,
+            },
+            valid=True,
+        )
+    )
+    if device_id:
+        items.append(
+            AlfredItem(
+                title="Copy Device Details",
+                subtitle="Device registry info as YAML",
+                icon=_SYSTEM_ICON,
+                variables={
+                    "entity_id": entity_id,
+                    "action": "copy_device_details",
+                    "domain": domain,
+                },
+                valid=True,
+            )
+        )
+
+    # --- Open in Home Assistant ---
+    items.append(
+        AlfredItem(
+            title="Open Entity",
+            subtitle="View in Home Assistant",
+            icon=_SYSTEM_ICON,
+            variables={
+                "entity_id": entity_id,
+                "action": "open_entity",
+                "domain": domain,
+            },
+            valid=True,
+        )
+    )
+    if device_id:
+        items.append(
+            AlfredItem(
+                title="Open Device",
+                subtitle="Device page in Home Assistant",
+                icon=_SYSTEM_ICON,
+                variables={
+                    "entity_id": entity_id,
+                    "action": "open_device",
+                    "domain": domain,
+                },
+                valid=True,
+            )
+        )
+    # NOTE: area_name comes from the cache, but open_area resolves area_id
+    # from the live registry.  If the cache is stale the user may see this
+    # item but get "No area found" — an acceptable trade-off vs an API call
+    # on every Cmd keypress.  The cache refreshes within CACHE_TTL seconds.
+    if area_name:
+        items.append(
+            AlfredItem(
+                title="Open Area",
+                subtitle=f"{area_name} in Home Assistant",
+                icon=_SYSTEM_ICON,
+                variables={
+                    "entity_id": entity_id,
+                    "action": "open_area",
+                    "domain": domain,
+                },
+                valid=True,
+            )
+        )
+    items.append(
+        AlfredItem(
+            title="Open History",
+            subtitle="Entity history in Home Assistant",
+            icon=_SYSTEM_ICON,
+            variables={
+                "entity_id": entity_id,
+                "action": "open_history",
+                "domain": domain,
+            },
+            valid=True,
+        )
+    )
+
+    # --- Advanced Action Call (stub) ---
+    items.append(
+        AlfredItem(
+            title="Advanced Action Call",
+            subtitle=f"Coming soon \u2014 advanced controls for {domain} entities",
+            icon=AlfredIcon(path=dc.icon_path),
+            valid=False,
+        )
+    )
 
     output = AlfredOutput(items=items)
     sys.stdout.write(output.to_json() + "\n")

@@ -1199,14 +1199,17 @@ class TestActionsCommand:
         out = capsys.readouterr().out  # type: ignore[union-attr]
         data = json.loads(out)
         titles = [item["title"] for item in data["items"]]
+        # Header + domain actions + copy/open/advanced
+        assert "Living Room" in titles[0]  # header
         assert "Toggle" in titles
         assert "Turn On" in titles
         assert "Turn Off" in titles
-        # Each item should have correct variables
+        # Actionable items (skip header) have correct variables
         for item in data["items"]:
-            assert item["variables"]["entity_id"] == "light.living_room"
-            assert item["variables"]["domain"] == "light"
-            assert "action" in item["variables"]
+            if item.get("valid") and "variables" in item:
+                assert item["variables"]["entity_id"] == "light.living_room"
+                assert item["variables"]["domain"] == "light"
+                assert "action" in item["variables"]
 
     def test_actions_for_cover(self, capsys: object) -> None:
         main(["actions", "cover.garage"])
@@ -1217,13 +1220,16 @@ class TestActionsCommand:
         assert "Close Cover" in titles
         assert "Stop Cover" in titles
 
-    def test_actions_display_only(self, capsys: object) -> None:
+    def test_actions_display_only_shows_submenu(self, capsys: object) -> None:
+        """Display-only entities still show copy/open actions."""
         main(["actions", "sensor.temperature"])
         out = capsys.readouterr().out  # type: ignore[union-attr]
         data = json.loads(out)
-        assert len(data["items"]) == 1
-        assert "No actions" in data["items"][0]["title"]
-        assert data["items"][0]["valid"] is False
+        titles = [item["title"] for item in data["items"]]
+        assert "Temperature" in titles[0]
+        assert "Copy Entity ID" in titles
+        assert "Open Entity" in titles
+        assert "Open History" in titles
 
     def test_actions_no_entity(self, capsys: object) -> None:
         main(["actions"])
@@ -1237,6 +1243,31 @@ class TestActionsCommand:
         data = json.loads(out)
         assert "Invalid entity ID" in data["items"][0]["title"]
         assert data["items"][0]["valid"] is False
+
+    def test_submenu_includes_advanced_stub(self, capsys: object) -> None:
+        main(["actions", "light.living_room"])
+        out = capsys.readouterr().out  # type: ignore[union-attr]
+        data = json.loads(out)
+        stub = [i for i in data["items"] if i["title"] == "Advanced Action Call"]
+        assert len(stub) == 1
+        assert stub[0]["valid"] is False
+        assert "Coming soon" in stub[0]["subtitle"]
+
+    def test_submenu_copy_entity_id(self, capsys: object) -> None:
+        main(["actions", "light.living_room"])
+        out = capsys.readouterr().out  # type: ignore[union-attr]
+        data = json.loads(out)
+        copy_items = [i for i in data["items"] if i["title"] == "Copy Entity ID"]
+        assert len(copy_items) == 1
+        assert copy_items[0]["variables"]["action"] == "copy_entity_id"
+
+    def test_submenu_open_history(self, capsys: object) -> None:
+        main(["actions", "light.living_room"])
+        out = capsys.readouterr().out  # type: ignore[union-attr]
+        data = json.loads(out)
+        items = [i for i in data["items"] if i["title"] == "Open History"]
+        assert len(items) == 1
+        assert items[0]["variables"]["action"] == "open_history"
 
 
 # ---------------------------------------------------------------------------
@@ -1586,3 +1617,137 @@ class TestHAClientGetHistory:
         client = HAClient(config, timeout=1)
         result = client.get_history("light.test")
         assert result == []
+
+
+# ---------------------------------------------------------------------------
+# Copy / Open action handlers
+# ---------------------------------------------------------------------------
+
+
+class TestCopyAction:
+    @patch("ha_workflow.cli.subprocess.run")
+    @patch("ha_workflow.cli.Config.from_env")
+    def test_copy_entity_id(
+        self,
+        mock_from_env: MagicMock,
+        mock_run: MagicMock,
+        capsys: object,
+    ) -> None:
+        mock_from_env.return_value = MagicMock()
+        main(["action", "light.living_room", "copy_entity_id"])
+        mock_run.assert_called_once()
+        assert mock_run.call_args[1]["input"] == b"light.living_room"
+        out = capsys.readouterr().out  # type: ignore[union-attr]
+        assert "Copied: light.living_room" in out
+
+    @patch("ha_workflow.cli.subprocess.run")
+    @patch("ha_workflow.cli.HAClient")
+    @patch("ha_workflow.cli.Config.from_env")
+    def test_copy_entity_details(
+        self,
+        mock_from_env: MagicMock,
+        mock_ha_client: MagicMock,
+        mock_run: MagicMock,
+        capsys: object,
+    ) -> None:
+        mock_from_env.return_value = MagicMock()
+        mock_client = MagicMock()
+        mock_client.get_state.return_value = {
+            "entity_id": "light.living_room",
+            "state": "on",
+            "attributes": {"friendly_name": "Living Room Light"},
+        }
+        mock_ha_client.return_value = mock_client
+        main(["action", "light.living_room", "copy_entity_details"])
+        mock_run.assert_called_once()
+        clipboard = mock_run.call_args[1]["input"].decode("utf-8")
+        assert "entity_id: light.living_room" in clipboard
+        out = capsys.readouterr().out  # type: ignore[union-attr]
+        assert "Copied details" in out
+
+
+class TestOpenAction:
+    @patch("ha_workflow.cli.subprocess.run")
+    @patch("ha_workflow.cli.Config.from_env")
+    def test_open_entity(
+        self,
+        mock_from_env: MagicMock,
+        mock_run: MagicMock,
+        capsys: object,
+    ) -> None:
+        mock_from_env.return_value = MagicMock(ha_url="http://ha.local:8123")
+        main(["action", "light.living_room", "open_entity"])
+        mock_run.assert_called_once()
+        url = mock_run.call_args[0][0][1]
+        assert "config/entities?filter=light.living_room" in url
+
+    @patch("ha_workflow.cli.subprocess.run")
+    @patch("ha_workflow.cli.Config.from_env")
+    def test_open_history(
+        self,
+        mock_from_env: MagicMock,
+        mock_run: MagicMock,
+        capsys: object,
+    ) -> None:
+        mock_from_env.return_value = MagicMock(ha_url="http://ha.local:8123")
+        main(["action", "light.living_room", "open_history"])
+        url = mock_run.call_args[0][0][1]
+        assert "history?entity_id=light.living_room" in url
+
+    @patch("ha_workflow.cli._lookup_device_id")
+    @patch("ha_workflow.cli.Config.from_env")
+    def test_open_device_no_device(
+        self,
+        mock_from_env: MagicMock,
+        mock_lookup_id: MagicMock,
+        capsys: object,
+    ) -> None:
+        mock_from_env.return_value = MagicMock(ha_url="http://ha.local:8123")
+        mock_lookup_id.return_value = ""
+        main(["action", "light.living_room", "open_device"])
+        out = capsys.readouterr().out  # type: ignore[union-attr]
+        assert "No device found" in out
+
+
+# ---------------------------------------------------------------------------
+# Lookup helpers
+# ---------------------------------------------------------------------------
+
+
+class TestLookupHelpers:
+    def test_lookup_device_id_found(self) -> None:
+        from ha_workflow.cli import _lookup_device_id
+
+        client = MagicMock()
+        client.get_entity_registry.return_value = [
+            {"entity_id": "light.lamp", "device_id": "dev_1"},
+        ]
+        assert _lookup_device_id(client, "light.lamp") == "dev_1"
+
+    def test_lookup_device_id_not_found(self) -> None:
+        from ha_workflow.cli import _lookup_device_id
+
+        client = MagicMock()
+        client.get_entity_registry.return_value = []
+        assert _lookup_device_id(client, "light.lamp") == ""
+
+    def test_lookup_area_id_direct(self) -> None:
+        from ha_workflow.cli import _lookup_area_id
+
+        client = MagicMock()
+        client.get_entity_registry.return_value = [
+            {"entity_id": "light.lamp", "area_id": "kitchen", "device_id": ""},
+        ]
+        assert _lookup_area_id(client, "light.lamp") == "kitchen"
+
+    def test_lookup_area_id_via_device(self) -> None:
+        from ha_workflow.cli import _lookup_area_id
+
+        client = MagicMock()
+        client.get_entity_registry.return_value = [
+            {"entity_id": "light.lamp", "area_id": "", "device_id": "dev_1"},
+        ]
+        client.get_device_registry.return_value = [
+            {"id": "dev_1", "area_id": "living_room"},
+        ]
+        assert _lookup_area_id(client, "light.lamp") == "living_room"
