@@ -1478,41 +1478,41 @@ class TestFormatRelativeTime:
         assert _format_relative_time("not-a-date") == ""
 
     @patch("ha_workflow.cli.time.time")
-    @patch("ha_workflow.cli.time.mktime")
-    def test_seconds_ago(self, mock_mktime: MagicMock, mock_time: MagicMock) -> None:
+    @patch("ha_workflow.cli.calendar.timegm")
+    def test_seconds_ago(self, mock_timegm: MagicMock, mock_time: MagicMock) -> None:
         from ha_workflow.cli import _format_relative_time
 
-        mock_mktime.return_value = 1000.0
+        mock_timegm.return_value = 1000.0
         mock_time.return_value = 1030.0
         result = _format_relative_time("2026-01-01T00:00:00+00:00")
         assert result == "30s ago"
 
     @patch("ha_workflow.cli.time.time")
-    @patch("ha_workflow.cli.time.mktime")
-    def test_minutes_ago(self, mock_mktime: MagicMock, mock_time: MagicMock) -> None:
+    @patch("ha_workflow.cli.calendar.timegm")
+    def test_minutes_ago(self, mock_timegm: MagicMock, mock_time: MagicMock) -> None:
         from ha_workflow.cli import _format_relative_time
 
-        mock_mktime.return_value = 1000.0
+        mock_timegm.return_value = 1000.0
         mock_time.return_value = 1000.0 + 300  # 5 minutes
         result = _format_relative_time("2026-01-01T00:00:00+00:00")
         assert result == "5m ago"
 
     @patch("ha_workflow.cli.time.time")
-    @patch("ha_workflow.cli.time.mktime")
-    def test_hours_ago(self, mock_mktime: MagicMock, mock_time: MagicMock) -> None:
+    @patch("ha_workflow.cli.calendar.timegm")
+    def test_hours_ago(self, mock_timegm: MagicMock, mock_time: MagicMock) -> None:
         from ha_workflow.cli import _format_relative_time
 
-        mock_mktime.return_value = 1000.0
+        mock_timegm.return_value = 1000.0
         mock_time.return_value = 1000.0 + 7200  # 2 hours
         result = _format_relative_time("2026-01-01T00:00:00+00:00")
         assert result == "2h ago"
 
     @patch("ha_workflow.cli.time.time")
-    @patch("ha_workflow.cli.time.mktime")
-    def test_days_ago(self, mock_mktime: MagicMock, mock_time: MagicMock) -> None:
+    @patch("ha_workflow.cli.calendar.timegm")
+    def test_days_ago(self, mock_timegm: MagicMock, mock_time: MagicMock) -> None:
         from ha_workflow.cli import _format_relative_time
 
-        mock_mktime.return_value = 1000.0
+        mock_timegm.return_value = 1000.0
         mock_time.return_value = 1000.0 + 172800  # 2 days
         result = _format_relative_time("2026-01-01T00:00:00+00:00")
         assert result == "2d ago"

@@ -7,6 +7,7 @@ Invoked as::
 
 from __future__ import annotations
 
+import calendar
 import os
 import subprocess
 import sys
@@ -38,6 +39,7 @@ from ha_workflow.usage import UsageRecord, open_usage_tracker  # noqa: E402
 _LOCK_FILENAME = ".refresh.lock"
 _DEBUG = os.environ.get("HA_DEBUG", "")
 _SYSTEM_ENTITY = "__system__"
+_YAML_SPECIAL_CHARS = frozenset(":#[]{},&*!|>")
 
 # ---------------------------------------------------------------------------
 # System commands — surfaced as search results, executed via action handler
@@ -534,8 +536,8 @@ def _format_relative_time(iso_timestamp: str) -> str:
         # HA timestamps: "2024-03-21T10:30:00.123456+00:00"
         # Strip fractional seconds and timezone for simple parsing
         clean = iso_timestamp.split(".")[0].replace("Z", "").replace("+00:00", "")
-        # time.strptime doesn't handle timezone — treat as UTC
-        ts = time.mktime(time.strptime(clean, "%Y-%m-%dT%H:%M:%S"))
+        # calendar.timegm interprets struct_time as UTC (unlike time.mktime)
+        ts = float(calendar.timegm(time.strptime(clean, "%Y-%m-%dT%H:%M:%S")))
         delta = time.time() - ts
         if delta < 0:
             return "just now"
@@ -584,9 +586,7 @@ def _yaml_scalar(value: object) -> str:
     if isinstance(value, (int, float)):
         return str(value)
     s = str(value)
-    # Quote strings containing special YAML characters
-    _yaml_special = set(":#[]{},&*!|>")
-    if any(c in _yaml_special for c in s):
+    if any(c in _YAML_SPECIAL_CHARS for c in s):
         return f'"{s}"'
     return s
 
@@ -849,6 +849,10 @@ def _cmd_actions(args: list[str]) -> None:
                 valid=True,
             )
         )
+    # NOTE: area_name comes from the cache, but open_area resolves area_id
+    # from the live registry.  If the cache is stale the user may see this
+    # item but get "No area found" — an acceptable trade-off vs an API call
+    # on every Cmd keypress.  The cache refreshes within CACHE_TTL seconds.
     if area_name:
         items.append(
             AlfredItem(
