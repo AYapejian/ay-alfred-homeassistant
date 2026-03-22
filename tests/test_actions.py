@@ -148,6 +148,13 @@ class TestDispatchActionErrors:
         assert result.success is False
         assert "Auth error" in result.message
 
+    def test_unexpected_error(self) -> None:
+        client = _mock_client()
+        client.call_service.side_effect = RuntimeError("something broke")
+        result = dispatch_action(client, "light.living_room", "toggle")
+        assert result.success is False
+        assert "Unexpected error" in result.message
+
 
 class TestActionResult:
     def test_dataclass_fields(self) -> None:

@@ -516,6 +516,19 @@ def _cmd_actions(args: list[str]) -> None:
         return
 
     domain = entity_id.split(".")[0] if "." in entity_id else ""
+    if not domain:
+        output = AlfredOutput(
+            items=[
+                AlfredItem(
+                    title="Invalid entity ID",
+                    subtitle=entity_id,
+                    valid=False,
+                )
+            ]
+        )
+        sys.stdout.write(output.to_json() + "\n")
+        return
+
     dc = get_domain_config(domain)
 
     if not dc.available_actions:

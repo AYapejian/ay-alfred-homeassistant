@@ -19,16 +19,10 @@ class ActionResult:
 
 
 # Actions whose HA service name differs from our action name.
-_SERVICE_OVERRIDES: dict[str, str] = {
-    "open_cover": "open_cover",
-    "close_cover": "close_cover",
-    "stop_cover": "stop_cover",
-    "return_to_base": "return_to_base",
-    "media_play": "media_play",
-    "media_pause": "media_pause",
-    "media_stop": "media_stop",
-    "set_temperature": "set_temperature",
-}
+# Currently empty — all actions map 1:1. Add overrides here if a
+# user-facing action name ever diverges from the HA service name
+# (e.g. "open" -> "open_cover").
+_SERVICE_OVERRIDES: dict[str, str] = {}
 
 
 def _action_label(action: str) -> str:
@@ -102,6 +96,8 @@ def dispatch_action(
         return ActionResult(success=False, message=f"Connection error: {exc}")
     except HAAuthError as exc:
         return ActionResult(success=False, message=f"Auth error: {exc}")
+    except Exception as exc:
+        return ActionResult(success=False, message=f"Unexpected error: {exc}")
 
     friendly = entity_id.split(".", 1)[1].replace("_", " ").title()
     label = _action_label(action)

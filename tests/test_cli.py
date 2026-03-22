@@ -908,6 +908,13 @@ class TestActionsCommand:
         data = json.loads(out)
         assert "No entity" in data["items"][0]["title"]
 
+    def test_actions_malformed_entity_id(self, capsys: object) -> None:
+        main(["actions", "badentity"])
+        out = capsys.readouterr().out  # type: ignore[union-attr]
+        data = json.loads(out)
+        assert "Invalid entity ID" in data["items"][0]["title"]
+        assert data["items"][0]["valid"] is False
+
 
 # ---------------------------------------------------------------------------
 # Area lookup
