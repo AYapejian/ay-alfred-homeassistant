@@ -23,7 +23,12 @@ if _WORKFLOW_ROOT not in sys.path:
 import re  # noqa: E402
 
 from ha_workflow.actions import dispatch_action  # noqa: E402
-from ha_workflow.alfred import AlfredIcon, AlfredItem, AlfredOutput  # noqa: E402
+from ha_workflow.alfred import (  # noqa: E402
+    AlfredIcon,
+    AlfredItem,
+    AlfredMod,
+    AlfredOutput,
+)
 from ha_workflow.cache import EntityCache, open_cache  # noqa: E402
 from ha_workflow.config import Config  # noqa: E402
 from ha_workflow.entities import Entity, get_domain_config  # noqa: E402
@@ -249,6 +254,16 @@ def _build_search_output(entities: list[Entity]) -> AlfredOutput:
                 "domain": entity.domain,
             },
             valid=bool(dc.default_action),
+            mods={
+                "cmd": AlfredMod(
+                    subtitle="Actions\u2026",
+                    valid=True,
+                    variables={
+                        "entity_id": entity.entity_id,
+                        "domain": entity.domain,
+                    },
+                ),
+            },
         )
         items.append(item)
 

@@ -378,6 +378,64 @@ class TestSearchCommand:
         item = data["items"][0]
         assert item["subtitle"].startswith("switch")
 
+    @patch("ha_workflow.cli.open_usage_tracker")
+    @patch("ha_workflow.cli._maybe_refresh_background")
+    @patch("ha_workflow.cli.open_cache")
+    @patch("ha_workflow.cli.Config.from_env")
+    def test_search_items_have_cmd_modifier(
+        self,
+        mock_from_env: MagicMock,
+        mock_open_cache: MagicMock,
+        mock_bg_refresh: MagicMock,
+        mock_open_tracker: MagicMock,
+        capsys: object,
+    ) -> None:
+        mock_from_env.return_value = MagicMock(cache_ttl=60)
+        mock_open_cache.return_value = _mock_cache()
+        mock_open_tracker.return_value = _mock_tracker()
+
+        main(["search", "living"])
+
+        out = capsys.readouterr().out  # type: ignore[union-attr]
+        data = json.loads(out)
+        item = data["items"][0]
+        # Cmd modifier must be present for sub-menu routing
+        assert "mods" in item
+        assert "cmd" in item["mods"]
+        cmd_mod = item["mods"]["cmd"]
+        assert cmd_mod["valid"] is True
+        assert cmd_mod["variables"]["entity_id"] == "light.living_room"
+
+    @patch("ha_workflow.cli.open_usage_tracker")
+    @patch("ha_workflow.cli._maybe_refresh_background")
+    @patch("ha_workflow.cli.open_cache")
+    @patch("ha_workflow.cli.Config.from_env")
+    def test_display_only_entity_has_cmd_modifier(
+        self,
+        mock_from_env: MagicMock,
+        mock_open_cache: MagicMock,
+        mock_bg_refresh: MagicMock,
+        mock_open_tracker: MagicMock,
+        capsys: object,
+    ) -> None:
+        """Display-only entities (sensors) must also have Cmd modifier."""
+        entities = [
+            _entity("sensor.temperature", "23.5", "Temperature"),
+        ]
+        mock_from_env.return_value = MagicMock(cache_ttl=60)
+        mock_open_cache.return_value = _mock_cache(entities=entities)
+        mock_open_tracker.return_value = _mock_tracker()
+
+        main(["search", "temperature"])
+
+        out = capsys.readouterr().out  # type: ignore[union-attr]
+        data = json.loads(out)
+        item = data["items"][0]
+        # Base valid=False (no default action), but Cmd must be valid
+        assert item.get("valid") is False
+        assert item["mods"]["cmd"]["valid"] is True
+        assert item["mods"]["cmd"]["variables"]["entity_id"] == "sensor.temperature"
+
 
 # ---------------------------------------------------------------------------
 # cache commands
