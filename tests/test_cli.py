@@ -1336,3 +1336,253 @@ class TestBuildRegistryLookup:
         )
         lookup = _build_registry_lookup(client)
         assert lookup["light.x"].area_name == ""
+
+
+# ---------------------------------------------------------------------------
+# Entity viewer actions (Phase 3: 3.8, 3.9)
+# ---------------------------------------------------------------------------
+
+
+class TestShowDetails:
+    @patch("ha_workflow.cli.subprocess.run")
+    @patch("ha_workflow.cli.HAClient")
+    @patch("ha_workflow.cli.Config.from_env")
+    def test_show_details_copies_yaml(
+        self,
+        mock_from_env: MagicMock,
+        mock_ha_client: MagicMock,
+        mock_run: MagicMock,
+        capsys: object,
+    ) -> None:
+        mock_from_env.return_value = MagicMock()
+        mock_client = MagicMock()
+        mock_client.get_state.return_value = {
+            "entity_id": "light.living_room",
+            "state": "on",
+            "attributes": {
+                "friendly_name": "Living Room Light",
+                "brightness": 200,
+            },
+        }
+        mock_ha_client.return_value = mock_client
+
+        main(["action", "light.living_room", "show_details"])
+
+        mock_run.assert_called_once()
+        clipboard = mock_run.call_args[1]["input"].decode("utf-8")
+        assert "entity_id: light.living_room" in clipboard
+        assert "state: on" in clipboard
+        assert "brightness: 200" in clipboard
+        out = capsys.readouterr().out  # type: ignore[union-attr]
+        assert "Copied details" in out
+        assert "Living Room Light" in out
+        assert "(on)" in out
+
+    @patch("ha_workflow.cli.HAClient")
+    @patch("ha_workflow.cli.Config.from_env")
+    def test_show_details_failure(
+        self,
+        mock_from_env: MagicMock,
+        mock_ha_client: MagicMock,
+        capsys: object,
+    ) -> None:
+        from ha_workflow.errors import HAConnectionError
+
+        mock_from_env.return_value = MagicMock()
+        mock_client = MagicMock()
+        mock_client.get_state.side_effect = HAConnectionError("timeout")
+        mock_ha_client.return_value = mock_client
+
+        main(["action", "light.living_room", "show_details"])
+
+        out = capsys.readouterr().out  # type: ignore[union-attr]
+        assert "Failed" in out
+
+
+class TestViewHistory:
+    @patch("ha_workflow.cli.subprocess.run")
+    @patch("ha_workflow.cli.HAClient")
+    @patch("ha_workflow.cli.Config.from_env")
+    def test_view_history_copies_log(
+        self,
+        mock_from_env: MagicMock,
+        mock_ha_client: MagicMock,
+        mock_run: MagicMock,
+        capsys: object,
+    ) -> None:
+        mock_from_env.return_value = MagicMock()
+        mock_client = MagicMock()
+        mock_client.get_history.return_value = [
+            {
+                "entity_id": "light.living_room",
+                "state": "off",
+                "last_changed": "2026-03-22T10:00:00.000000+00:00",
+            },
+            {
+                "entity_id": "light.living_room",
+                "state": "on",
+                "last_changed": "2026-03-22T10:30:00.000000+00:00",
+            },
+        ]
+        mock_ha_client.return_value = mock_client
+
+        main(["action", "light.living_room", "view_history"])
+
+        mock_run.assert_called_once()
+        clipboard = mock_run.call_args[1]["input"].decode("utf-8")
+        assert "light.living_room" in clipboard
+        assert "10:00:00" in clipboard
+        assert "off" in clipboard
+        assert "10:30:00" in clipboard
+        assert "on" in clipboard
+        out = capsys.readouterr().out  # type: ignore[union-attr]
+        assert "2 state changes" in out
+
+    @patch("ha_workflow.cli.HAClient")
+    @patch("ha_workflow.cli.Config.from_env")
+    def test_view_history_no_changes(
+        self,
+        mock_from_env: MagicMock,
+        mock_ha_client: MagicMock,
+        capsys: object,
+    ) -> None:
+        mock_from_env.return_value = MagicMock()
+        mock_client = MagicMock()
+        mock_client.get_history.return_value = []
+        mock_ha_client.return_value = mock_client
+
+        main(["action", "light.living_room", "view_history"])
+
+        out = capsys.readouterr().out  # type: ignore[union-attr]
+        assert "No history found" in out
+
+    @patch("ha_workflow.cli.HAClient")
+    @patch("ha_workflow.cli.Config.from_env")
+    def test_view_history_failure(
+        self,
+        mock_from_env: MagicMock,
+        mock_ha_client: MagicMock,
+        capsys: object,
+    ) -> None:
+        mock_from_env.return_value = MagicMock()
+        mock_client = MagicMock()
+        mock_client.get_history.side_effect = Exception("network error")
+        mock_ha_client.return_value = mock_client
+
+        main(["action", "light.living_room", "view_history"])
+
+        out = capsys.readouterr().out  # type: ignore[union-attr]
+        assert "Failed" in out
+
+
+class TestFormatAsYaml:
+    def test_simple_dict(self) -> None:
+        from ha_workflow.cli import _format_as_yaml
+
+        result = _format_as_yaml({"key": "value", "num": 42})
+        assert "key: value" in result
+        assert "num: 42" in result
+
+    def test_nested_dict(self) -> None:
+        from ha_workflow.cli import _format_as_yaml
+
+        result = _format_as_yaml({"outer": {"inner": "val"}})
+        assert "outer:" in result
+        assert "  inner: val" in result
+
+    def test_list(self) -> None:
+        from ha_workflow.cli import _format_as_yaml
+
+        result = _format_as_yaml({"items": ["a", "b"]})
+        assert "items:" in result
+        assert "- a" in result
+        assert "- b" in result
+
+    def test_none_and_bool(self) -> None:
+        from ha_workflow.cli import _format_as_yaml
+
+        result = _format_as_yaml({"x": None, "y": True, "z": False})
+        assert "x: null" in result
+        assert "y: true" in result
+        assert "z: false" in result
+
+
+class TestFormatHistoryEntry:
+    def test_normal_entry(self) -> None:
+        from ha_workflow.cli import _format_history_entry
+
+        entry = {
+            "state": "on",
+            "last_changed": "2026-03-22T10:30:00.123+00:00",
+        }
+        result = _format_history_entry(entry)
+        assert "10:30:00" in result
+        assert "on" in result
+
+    def test_missing_fields(self) -> None:
+        from ha_workflow.cli import _format_history_entry
+
+        result = _format_history_entry({})
+        assert "?" in result
+
+
+# ---------------------------------------------------------------------------
+# ha_client.get_history() tests
+# ---------------------------------------------------------------------------
+
+
+class TestHAClientGetHistory:
+    @patch("ha_workflow.ha_client.urllib.request.urlopen")
+    def test_get_history_returns_flat_list(self, mock_urlopen: MagicMock) -> None:
+        from ha_workflow.config import Config
+        from ha_workflow.ha_client import HAClient
+
+        changes = [
+            {"state": "off", "last_changed": "2026-03-22T10:00:00"},
+            {"state": "on", "last_changed": "2026-03-22T10:30:00"},
+        ]
+        mock_resp = MagicMock()
+        mock_resp.read.return_value = json.dumps([changes]).encode("utf-8")
+        mock_resp.headers = {"Content-Type": "application/json"}
+        mock_resp.__enter__ = lambda s: s
+        mock_resp.__exit__ = MagicMock(return_value=False)
+        mock_urlopen.return_value = mock_resp
+
+        config = MagicMock(spec=Config)
+        config.ha_url = "http://ha.local:8123"
+        config.ha_token = "test-token"
+        client = HAClient(config)
+        result = client.get_history("light.test", hours=1)
+        assert len(result) == 2
+        assert result[0]["state"] == "off"
+        assert result[1]["state"] == "on"
+
+    @patch("ha_workflow.ha_client.urllib.request.urlopen")
+    def test_get_history_empty(self, mock_urlopen: MagicMock) -> None:
+        from ha_workflow.config import Config
+        from ha_workflow.ha_client import HAClient
+
+        mock_resp = MagicMock()
+        mock_resp.read.return_value = b"[[]]"
+        mock_resp.headers = {"Content-Type": "application/json"}
+        mock_resp.__enter__ = lambda s: s
+        mock_resp.__exit__ = MagicMock(return_value=False)
+        mock_urlopen.return_value = mock_resp
+
+        config = MagicMock(spec=Config)
+        config.ha_url = "http://ha.local:8123"
+        config.ha_token = "test-token"
+        client = HAClient(config)
+        result = client.get_history("light.test")
+        assert result == []
+
+    def test_get_history_connection_error_returns_empty(self) -> None:
+        from ha_workflow.config import Config
+        from ha_workflow.ha_client import HAClient
+
+        config = MagicMock(spec=Config)
+        config.ha_url = "http://nonexistent:9999"
+        config.ha_token = "test-token"
+        client = HAClient(config, timeout=1)
+        result = client.get_history("light.test")
+        assert result == []

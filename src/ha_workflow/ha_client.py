@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import datetime
 import json
 import urllib.error
+import urllib.parse
 import urllib.request
 from typing import Any, Optional, Union
 
@@ -140,6 +142,38 @@ class HAClient:
             result = self._request("GET", "/api/config/area_registry")
             if isinstance(result, list):
                 return result
+        except (HAConnectionError, HAAuthError):
+            pass
+        return []
+
+    def get_history(
+        self,
+        entity_id: str,
+        hours: int = 1,
+    ) -> list[dict[str, Any]]:
+        """Fetch state history for *entity_id* over the last *hours*.
+
+        Uses ``GET /api/history/period/<start>?filter_entity_id=<id>``.
+        Returns a flat list of state-change dicts (newest last).
+        Returns an empty list on failure.
+        """
+        now = datetime.datetime.now(datetime.timezone.utc)
+        start = now - datetime.timedelta(hours=hours)
+        start_str = start.strftime("%Y-%m-%dT%H:%M:%S") + "Z"
+
+        safe_id = urllib.parse.quote(entity_id, safe="")
+        path = (
+            f"/api/history/period/{start_str}"
+            f"?filter_entity_id={safe_id}"
+            f"&minimal_response"
+        )
+        try:
+            result = self._request("GET", path)
+            # API returns [[change1, change2, ...]] (list of lists)
+            if isinstance(result, list) and result:
+                inner = result[0]
+                if isinstance(inner, list):
+                    return inner
         except (HAConnectionError, HAAuthError):
             pass
         return []
