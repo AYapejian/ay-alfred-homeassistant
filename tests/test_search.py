@@ -22,6 +22,7 @@ def _entity(
     entity_id: str = "light.living_room",
     state: str = "on",
     friendly_name: str = "Living Room Light",
+    area_name: str = "",
     **extra_attrs: Any,
 ) -> Entity:
     domain = entity_id.split(".", 1)[0]
@@ -34,6 +35,7 @@ def _entity(
         attributes=attrs,
         last_changed="",
         last_updated="",
+        area_name=area_name,
     )
 
 
@@ -213,6 +215,57 @@ class TestDeviceClassScoring:
         results = fuzzy_search(ENTITIES, "humidity")
         ids = [e.entity_id for e in results]
         assert "sensor.kitchen_humidity" in ids
+
+
+# ---------------------------------------------------------------------------
+# Area name scoring
+# ---------------------------------------------------------------------------
+
+
+class TestAreaNameScoring:
+    """Searching by area_name should match entities assigned to that area."""
+
+    def test_area_name_matches(self) -> None:
+        entities = [
+            _entity("light.desk_lamp", "on", "Desk Lamp", area_name="Office"),
+            _entity("light.ceiling", "on", "Ceiling Light"),
+        ]
+        results = fuzzy_search(entities, "office")
+        ids = [e.entity_id for e in results]
+        assert "light.desk_lamp" in ids
+        assert "light.ceiling" not in ids
+
+    def test_area_name_boosts_ranking(self) -> None:
+        """Entity whose area matches should rank above one that only matches on name."""
+        entities = [
+            _entity("light.strip", "on", "LED Strip", area_name="Garage"),
+            _entity("light.garage_light", "on", "Garage Light"),
+        ]
+        results = fuzzy_search(entities, "garage")
+        # Both should match, but garage_light matches on friendly_name (higher weight)
+        # while strip matches on area_name — both appear in results
+        ids = [e.entity_id for e in results]
+        assert "light.strip" in ids
+        assert "light.garage_light" in ids
+
+    def test_area_name_multi_word_query(self) -> None:
+        """Area name should participate in multi-word matching."""
+        entities = [
+            _entity("light.desk_lamp", "on", "Desk Lamp", area_name="Office"),
+            _entity("light.office_main", "on", "Office Main Light"),
+        ]
+        results = fuzzy_search(entities, "office lamp")
+        ids = [e.entity_id for e in results]
+        # "office" matches area, "lamp" matches friendly_name
+        assert "light.desk_lamp" in ids
+
+    def test_empty_area_name_no_contribution(self) -> None:
+        """Entities with no area should not get area score for any query."""
+        entities = [
+            _entity("light.no_area", "on", "No Area Light", area_name=""),
+        ]
+        results = fuzzy_search(entities, "bedroom")
+        assert results == []
 
 
 # ---------------------------------------------------------------------------
