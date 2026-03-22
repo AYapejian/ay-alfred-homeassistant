@@ -1,19 +1,16 @@
-"""macOS notification helpers for the Alfred workflow.
+"""Notification helpers for the Alfred workflow.
 
-Two mechanisms:
+Two distinct channels — never both for the same event:
 
-1. **Alfred Post Notification** — stdout text flows through the Alfred
-   workflow graph to the notification output node.  Fast but unreliable
-   (depends on correct wiring and Alfred processing the output).
+1. **Foreground (Alfred context)** — :func:`notify` / :func:`notify_error`
+   write to stdout, which flows through the Alfred workflow graph to the
+   Post Notification output node.  Used by action handlers invoked from
+   Alfred's UI.
 
-2. **macOS native notification** — ``osascript -e 'display notification'``.
-   Always visible as a system toast/banner.  Works from background
-   processes too.
-
-Foreground action handlers should call :func:`notify` which does both:
-writes to stdout (for Alfred) AND posts a macOS notification (belt and
-suspenders).  Background processes should call :func:`notify_background`
-which only posts the macOS notification (no Alfred context).
+2. **Background (no Alfred context)** — :func:`notify_background` /
+   :func:`notify_background_error` post a macOS native notification via
+   ``osascript``.  Used by detached subprocesses (cache refresh, etc.)
+   where there is no Alfred pipeline to receive stdout.
 """
 
 from __future__ import annotations
@@ -55,28 +52,37 @@ def _macos_notification(
         )
 
 
+# ---------------------------------------------------------------------------
+# Foreground — stdout for Alfred's notification pipeline
+# ---------------------------------------------------------------------------
+
+
 def notify(message: str, subtitle: str = "") -> None:
     """Notify the user of a foreground action result.
 
-    Writes *message* to stdout (for Alfred's notification pipeline) AND
-    posts a macOS native notification (guaranteed visibility).
+    Writes *message* to stdout so Alfred's Post Notification output node
+    displays it.  Do NOT call from background processes.
     """
     sys.stdout.write(message + "\n")
-    _macos_notification(message, subtitle=subtitle)
 
 
 def notify_error(message: str, subtitle: str = "") -> None:
-    """Notify the user of an error (foreground or background).
+    """Notify the user of a foreground error.
 
-    Same as :func:`notify` but adds the system alert sound so errors
-    are audibly distinct from success notifications.
+    Same stdout channel as :func:`notify`.  The ``subtitle`` parameter is
+    accepted for API compatibility but currently unused (Alfred's Post
+    Notification node only shows the text body).
     """
     sys.stdout.write(message + "\n")
-    _macos_notification(message, subtitle=subtitle, sound="Funk")
+
+
+# ---------------------------------------------------------------------------
+# Background — macOS toast (no Alfred context)
+# ---------------------------------------------------------------------------
 
 
 def notify_background(message: str, subtitle: str = "") -> None:
-    """Notify from a background process (no stdout, macOS toast only)."""
+    """Notify from a background process (macOS toast, no stdout)."""
     _macos_notification(message, subtitle=subtitle)
 
 

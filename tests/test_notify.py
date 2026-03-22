@@ -24,46 +24,54 @@ class TestEscapeApplescript:
         assert _escape_applescript("path\\to") == "path\\\\to"
 
 
-class TestNotify:
+class TestForegroundNotify:
+    """Foreground functions write to stdout only — no macOS toast."""
+
+    def test_notify_writes_stdout(self, capsys: object) -> None:
+        notify("Toggled light")
+        out = capsys.readouterr().out  # type: ignore[union-attr]
+        assert out == "Toggled light\n"
+
+    def test_notify_error_writes_stdout(self, capsys: object) -> None:
+        notify_error("Connection failed")
+        out = capsys.readouterr().out  # type: ignore[union-attr]
+        assert out == "Connection failed\n"
+
     @patch("ha_workflow.notify._macos_notification")
-    def test_notify_writes_stdout_and_posts_toast(
+    def test_notify_does_not_post_toast(
         self, mock_macos: MagicMock, capsys: object
     ) -> None:
         notify("Toggled light")
-        out = capsys.readouterr().out  # type: ignore[union-attr]
-        assert "Toggled light" in out
-        mock_macos.assert_called_once_with("Toggled light", subtitle="")
+        capsys.readouterr()  # type: ignore[union-attr]
+        mock_macos.assert_not_called()
 
     @patch("ha_workflow.notify._macos_notification")
-    def test_notify_error_plays_sound(
+    def test_notify_error_does_not_post_toast(
         self, mock_macos: MagicMock, capsys: object
     ) -> None:
         notify_error("Connection failed")
-        out = capsys.readouterr().out  # type: ignore[union-attr]
-        assert "Connection failed" in out
-        mock_macos.assert_called_once_with(
-            "Connection failed", subtitle="", sound="Funk"
-        )
+        capsys.readouterr()  # type: ignore[union-attr]
+        mock_macos.assert_not_called()
+
+
+class TestBackgroundNotify:
+    """Background functions post macOS toast only — no stdout."""
 
     @patch("ha_workflow.notify._macos_notification")
-    def test_notify_background_no_stdout(
-        self, mock_macos: MagicMock, capsys: object
-    ) -> None:
+    def test_background_no_stdout(self, mock_macos: MagicMock, capsys: object) -> None:
         notify_background("Cache refreshed")
         out = capsys.readouterr().out  # type: ignore[union-attr]
         assert out == ""
         mock_macos.assert_called_once()
 
     @patch("ha_workflow.notify._macos_notification")
-    def test_notify_background_error_plays_sound(
+    def test_background_error_no_stdout_with_sound(
         self, mock_macos: MagicMock, capsys: object
     ) -> None:
         notify_background_error("Refresh failed")
         out = capsys.readouterr().out  # type: ignore[union-attr]
         assert out == ""
-        mock_macos.assert_called_once_with(
-            "Refresh failed", subtitle="", sound="Funk"
-        )
+        mock_macos.assert_called_once_with("Refresh failed", subtitle="", sound="Funk")
 
 
 class TestMacosNotification:
