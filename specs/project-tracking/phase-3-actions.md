@@ -52,6 +52,20 @@ Phase 3 builds on this: implement the entity action dispatcher and wire `record-
 - Keywords: "restart", "reboot", "check config", "validate", "log", "error", "debug"
 - Also improved keyword matching from substring to word-prefix (avoids false positives)
 
+### 3.8 — "Show Entity Details" viewer ✅
+- [x] **Done** — PR #24 (2026-03-22)
+- Fetches full entity state via `ha_client.get_state()`, formats as YAML
+- Copies to clipboard via `pbcopy`, shows notification with entity name + state
+- Action name: `show_details`, routed in `_cmd_action()`
+
+### 3.9 — "View History" action ✅
+- [x] **Done** — PR #24 (2026-03-22)
+- New `HAClient.get_history()` method — `GET /api/history/period` with `filter_entity_id`
+- Fetches last hour of state changes, formats as chronological log
+- Copies to clipboard via `pbcopy`, shows notification with change count
+- Action name: `view_history`, routed in `_cmd_action()`
+- Also added: `_format_as_yaml()`, `_format_relative_time()`, `_format_history_entry()` helpers
+
 ---
 
 ## Acceptance Criteria
@@ -61,4 +75,6 @@ Phase 3 builds on this: implement the entity action dispatcher and wire `record-
 - [x] `ha restart` -> shows "System: Restart Home Assistant", Enter -> HA restarts
 - [x] `ha logs` -> shows "System: View error log", Enter -> copies error log to clipboard
 - [x] `ha check config` -> shows "System: Check config", Enter -> validates config
+- [x] "Show Entity Details" copies YAML to clipboard with notification
+- [x] "View History" copies last hour of state changes to clipboard
 - [ ] After using entities, empty `ha` query shows recently used entities first (usage tracking end-to-end)

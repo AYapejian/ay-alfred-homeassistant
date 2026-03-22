@@ -144,6 +144,39 @@ class HAClient:
             pass
         return []
 
+    def get_history(
+        self,
+        entity_id: str,
+        hours: int = 1,
+    ) -> list[dict[str, Any]]:
+        """Fetch state history for *entity_id* over the last *hours*.
+
+        Uses ``GET /api/history/period/<start>?filter_entity_id=<id>``.
+        Returns a flat list of state-change dicts (newest last).
+        Returns an empty list on failure.
+        """
+        import datetime
+
+        now = datetime.datetime.now(datetime.timezone.utc)
+        start = now - datetime.timedelta(hours=hours)
+        start_str = start.strftime("%Y-%m-%dT%H:%M:%S") + "+00:00"
+
+        path = (
+            f"/api/history/period/{start_str}"
+            f"?filter_entity_id={entity_id}"
+            f"&minimal_response"
+        )
+        try:
+            result = self._request("GET", path)
+            # API returns [[change1, change2, ...]] (list of lists)
+            if isinstance(result, list) and result:
+                inner = result[0]
+                if isinstance(inner, list):
+                    return inner
+        except (HAConnectionError, HAAuthError):
+            pass
+        return []
+
     def check_config(self) -> dict[str, Any]:
         """``POST /api/config/core/check_config``."""
         result = self._request("POST", "/api/config/core/check_config")

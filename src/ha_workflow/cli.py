@@ -10,7 +10,8 @@ from __future__ import annotations
 import os
 import subprocess
 import sys
-from typing import NamedTuple, Optional
+import time
+from typing import Any, NamedTuple, Optional
 
 # When Alfred runs ``python3 ha_workflow/cli.py …``, Python sets sys.path[0]
 # to the ha_workflow/ directory (the script's parent).  Package-level imports
@@ -508,6 +509,14 @@ def _cmd_action(args: list[str]) -> None:
         sys.stdout.write("Missing entity_id or action\n")
         return
 
+    # Viewer actions — copy detailed info to clipboard
+    if action == "show_details":
+        _cmd_show_details(entity_id)
+        return
+    if action == "view_history":
+        _cmd_view_history(entity_id)
+        return
+
     config = Config.from_env()
     client = HAClient(config)
     result = dispatch_action(client, entity_id, action)
@@ -583,6 +592,116 @@ def _cmd_system_action(action: str) -> None:
 
     else:
         sys.stdout.write(f"Unknown system action: {action}\n")
+
+
+# ---------------------------------------------------------------------------
+# Entity viewer actions
+# ---------------------------------------------------------------------------
+
+
+def _format_as_yaml(data: Any, indent: int = 0) -> str:
+    """Format a dict/list as simple YAML-like text (no external dependency)."""
+    lines: list[str] = []
+    prefix = "  " * indent
+
+    if isinstance(data, dict):
+        for key, value in data.items():
+            if isinstance(value, (dict, list)) and value:
+                lines.append(f"{prefix}{key}:")
+                lines.append(_format_as_yaml(value, indent + 1))
+            else:
+                lines.append(f"{prefix}{key}: {_yaml_scalar(value)}")
+    elif isinstance(data, list):
+        for item in data:
+            if isinstance(item, (dict, list)) and item:
+                lines.append(f"{prefix}-")
+                lines.append(_format_as_yaml(item, indent + 1))
+            else:
+                lines.append(f"{prefix}- {_yaml_scalar(item)}")
+    else:
+        lines.append(f"{prefix}{_yaml_scalar(data)}")
+
+    return "\n".join(lines)
+
+
+def _yaml_scalar(value: object) -> str:
+    """Format a scalar value for YAML-like output."""
+    if value is None:
+        return "null"
+    if isinstance(value, bool):
+        return "true" if value else "false"
+    if isinstance(value, (int, float)):
+        return str(value)
+    s = str(value)
+    _yaml_special = set(":#[]{},&*!|>")
+    if any(c in _yaml_special for c in s):
+        return f'"{s}"'
+    return s
+
+
+def _format_relative_time(iso_timestamp: str) -> str:
+    """Convert an ISO-8601 timestamp to a human-readable relative string."""
+    if not iso_timestamp:
+        return ""
+    try:
+        clean = iso_timestamp.split(".")[0].replace("Z", "")
+        clean = clean.replace("+00:00", "")
+        ts = time.mktime(time.strptime(clean, "%Y-%m-%dT%H:%M:%S"))
+        delta = time.time() - ts
+        if delta < 0:
+            return "just now"
+        if delta < 60:
+            return f"{int(delta)}s ago"
+        if delta < 3600:
+            return f"{int(delta // 60)}m ago"
+        if delta < 86400:
+            return f"{int(delta // 3600)}h ago"
+        return f"{int(delta // 86400)}d ago"
+    except (ValueError, OverflowError):
+        return ""
+
+
+def _format_history_entry(entry: dict[str, Any]) -> str:
+    """Format a single history state-change entry as a readable line."""
+    state = entry.get("state", "?")
+    changed = entry.get("last_changed", "")
+    # Extract time portion from ISO timestamp
+    time_part = changed.split("T")[1].split(".")[0] if "T" in changed else changed
+    return f"{time_part}  {state}"
+
+
+def _cmd_show_details(entity_id: str) -> None:
+    """Fetch full entity state, format as YAML, copy to clipboard."""
+    config = Config.from_env()
+    client = HAClient(config)
+    try:
+        state = client.get_state(entity_id)
+        text = _format_as_yaml(state)
+        friendly = state.get("attributes", {}).get("friendly_name", entity_id)
+        subprocess.run(["pbcopy"], input=text.encode("utf-8"), check=True)
+        current_state = state.get("state", "unknown")
+        sys.stdout.write(f"Copied details for {friendly} ({current_state})\n")
+    except Exception as exc:
+        sys.stdout.write(f"Failed to fetch details: {exc}\n")
+
+
+def _cmd_view_history(entity_id: str) -> None:
+    """Fetch entity history, format as text, copy to clipboard."""
+    config = Config.from_env()
+    client = HAClient(config)
+    try:
+        changes = client.get_history(entity_id, hours=1)
+        if not changes:
+            sys.stdout.write(f"No history found for {entity_id} (last hour)\n")
+            return
+        lines = [f"History for {entity_id} (last hour)", ""]
+        for entry in changes:
+            lines.append(_format_history_entry(entry))
+        text = "\n".join(lines)
+        subprocess.run(["pbcopy"], input=text.encode("utf-8"), check=True)
+        sys.stdout.write(f"History copied ({len(changes)} state changes)\n")
+    except Exception as exc:
+        sys.stdout.write(f"Failed to fetch history: {exc}\n")
 
 
 def _cmd_actions(args: list[str]) -> None:
