@@ -39,7 +39,8 @@ class EntityCache:
                 attributes_json TEXT NOT NULL,
                 last_changed  TEXT NOT NULL,
                 last_updated  TEXT NOT NULL,
-                area_name     TEXT NOT NULL DEFAULT ''
+                area_name     TEXT NOT NULL DEFAULT '',
+                device_id     TEXT NOT NULL DEFAULT ''
             );
 
             CREATE INDEX IF NOT EXISTS idx_entities_domain
@@ -53,14 +54,15 @@ class EntityCache:
             );
             """
         )
-        # Migrate pre-existing databases that lack the area_name column.
-        # For fresh databases the column already exists, so the probe is a no-op.
-        try:
-            self._conn.execute("SELECT area_name FROM entities LIMIT 1")
-        except sqlite3.OperationalError:
-            self._conn.execute(
-                "ALTER TABLE entities ADD COLUMN area_name TEXT NOT NULL DEFAULT ''"
-            )
+        # Migrate pre-existing databases that lack newer columns.
+        for col, ddl in (
+            ("area_name", "area_name TEXT NOT NULL DEFAULT ''"),
+            ("device_id", "device_id TEXT NOT NULL DEFAULT ''"),
+        ):
+            try:
+                self._conn.execute(f"SELECT {col} FROM entities LIMIT 1")
+            except sqlite3.OperationalError:
+                self._conn.execute(f"ALTER TABLE entities ADD COLUMN {ddl}")
         self._conn.commit()
 
     # ------------------------------------------------------------------
@@ -74,8 +76,8 @@ class EntityCache:
         cur.executemany(
             "INSERT INTO entities "
             "(entity_id, domain, state, friendly_name, "
-            "attributes_json, last_changed, last_updated, area_name) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            "attributes_json, last_changed, last_updated, area_name, device_id) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
             [
                 (
                     e.entity_id,
@@ -86,6 +88,7 @@ class EntityCache:
                     e.last_changed,
                     e.last_updated,
                     e.area_name,
+                    e.device_id,
                 )
                 for e in entities
             ],
@@ -100,7 +103,7 @@ class EntityCache:
         """Return every cached entity."""
         cur = self._conn.execute(
             "SELECT entity_id, domain, state, friendly_name, "
-            "attributes_json, last_changed, last_updated, area_name "
+            "attributes_json, last_changed, last_updated, area_name, device_id "
             "FROM entities"
         )
         return [self._row_to_entity(row) for row in cur.fetchall()]
@@ -109,7 +112,7 @@ class EntityCache:
         """Return all cached entities in the given *domain*."""
         cur = self._conn.execute(
             "SELECT entity_id, domain, state, friendly_name, "
-            "attributes_json, last_changed, last_updated, area_name "
+            "attributes_json, last_changed, last_updated, area_name, device_id "
             "FROM entities WHERE domain = ?",
             (domain,),
         )
@@ -127,7 +130,7 @@ class EntityCache:
         pattern = f"%{query}%"
         cur = self._conn.execute(
             "SELECT entity_id, domain, state, friendly_name, "
-            "attributes_json, last_changed, last_updated, area_name "
+            "attributes_json, last_changed, last_updated, area_name, device_id "
             "FROM entities "
             "WHERE entity_id LIKE ? OR friendly_name LIKE ?",
             (pattern, pattern),
@@ -170,6 +173,7 @@ class EntityCache:
             last_changed=row[5],
             last_updated=row[6],
             area_name=row[7],
+            device_id=row[8],
         )
 
 

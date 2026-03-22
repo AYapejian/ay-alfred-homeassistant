@@ -116,6 +116,16 @@ class TestFromStateDict:
         e = Entity.from_state_dict(data, area_name="Kitchen")
         assert e.area_name == "Kitchen"
 
+    def test_device_id_default_empty(self) -> None:
+        data = _state_dict()
+        e = Entity.from_state_dict(data)
+        assert e.device_id == ""
+
+    def test_device_id_passed_through(self) -> None:
+        data = _state_dict()
+        e = Entity.from_state_dict(data, device_id="abc123")
+        assert e.device_id == "abc123"
+
 
 class TestDeviceClass:
     def test_present(self) -> None:

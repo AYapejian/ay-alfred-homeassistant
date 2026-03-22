@@ -28,6 +28,7 @@ _SCORE_CHAR_SEQUENCE = 20
 
 _WEIGHT_FRIENDLY_NAME = 3.0
 _WEIGHT_ENTITY_ID = 2.0
+_WEIGHT_AREA_NAME = 1.5
 _WEIGHT_DEVICE_CLASS = 1.0
 _WEIGHT_ATTRIBUTES = 0.5
 
@@ -96,11 +97,9 @@ def _score_entity(entity: Entity, query: str) -> float:
     if device_class:
         score += _score_field(device_class, query) * _WEIGHT_DEVICE_CLASS
 
-    # Area / room attributes — lowest weight
-    for attr_key in ("area_id", "area_name"):
-        val = entity.attributes.get(attr_key)
-        if val and isinstance(val, str):
-            score += _score_field(val, query) * _WEIGHT_ATTRIBUTES
+    # Area name — from the entity registry, not HA state attributes
+    if entity.area_name:
+        score += _score_field(entity.area_name, query) * _WEIGHT_AREA_NAME
 
     return score
 

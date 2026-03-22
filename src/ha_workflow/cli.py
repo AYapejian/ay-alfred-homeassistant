@@ -10,7 +10,7 @@ from __future__ import annotations
 import os
 import subprocess
 import sys
-from typing import Optional
+from typing import NamedTuple, Optional
 
 # When Alfred runs ``python3 ha_workflow/cli.py …``, Python sets sys.path[0]
 # to the ha_workflow/ directory (the script's parent).  Package-level imports
@@ -109,28 +109,56 @@ def _dbg(msg: str) -> None:
         sys.stderr.flush()
 
 
-def _build_area_lookup(client: HAClient) -> dict[str, str]:
-    """Fetch entity + area registries and return ``{entity_id: area_name}``."""
+class _RegistryInfo(NamedTuple):
+    """Per-entity info resolved from the HA registries."""
+
+    area_name: str
+    device_id: str
+
+
+def _build_registry_lookup(client: HAClient) -> dict[str, _RegistryInfo]:
+    """Fetch entity, device, and area registries.
+
+    Returns ``{entity_id: _RegistryInfo}`` with area resolved through the
+    device when the entity itself has no direct ``area_id``.
+    """
     try:
-        areas = client.get_area_registry()
+        # area_id → area name
         area_names: dict[str, str] = {}
-        for area in areas:
+        for area in client.get_area_registry():
             aid = area.get("area_id", "")
             name = area.get("name", "")
             if aid and name:
                 area_names[aid] = name
 
-        entity_reg = client.get_entity_registry()
-        lookup: dict[str, str] = {}
-        for entry in entity_reg:
+        # device id → area_id
+        device_areas: dict[str, str] = {}
+        for dev in client.get_device_registry():
+            did = dev.get("id", "")
+            aid = dev.get("area_id", "")
+            if did and aid:
+                device_areas[did] = aid
+
+        # entity_id → (area_name, device_id)
+        lookup: dict[str, _RegistryInfo] = {}
+        for entry in client.get_entity_registry():
             eid = entry.get("entity_id", "")
-            aid = entry.get("area_id", "")
-            if eid and aid and aid in area_names:
-                lookup[eid] = area_names[aid]
+            if not eid:
+                continue
+
+            device_id = entry.get("device_id") or ""
+
+            # Entity-level area_id takes priority over device-level
+            area_id = entry.get("area_id") or ""
+            if not area_id and device_id:
+                area_id = device_areas.get(device_id, "")
+
+            area_name = area_names.get(area_id, "")
+            lookup[eid] = _RegistryInfo(area_name=area_name, device_id=device_id)
 
         return lookup
     except Exception:
-        _dbg("_build_area_lookup: failed, returning empty lookup")
+        _dbg("_build_registry_lookup: failed, returning empty lookup")
         return {}
 
 
@@ -141,13 +169,20 @@ def _refresh_cache(config: Config, cache: EntityCache) -> None:
     states = client.get_states()
     _dbg(f"refresh_cache: get_states returned {len(states)} items")
 
-    area_lookup = _build_area_lookup(client)
-    _dbg(f"refresh_cache: area_lookup has {len(area_lookup)} entries")
+    registry = _build_registry_lookup(client)
+    _dbg(f"refresh_cache: registry lookup has {len(registry)} entries")
 
-    entities = [
-        Entity.from_state_dict(s, area_name=area_lookup.get(s.get("entity_id", ""), ""))
-        for s in states
-    ]
+    entities = []
+    for s in states:
+        eid = s.get("entity_id", "")
+        info = registry.get(eid)
+        entities.append(
+            Entity.from_state_dict(
+                s,
+                area_name=info.area_name if info else "",
+                device_id=info.device_id if info else "",
+            )
+        )
     cache.refresh(entities)
     _dbg(f"refresh_cache: wrote {len(entities)} entities to cache")
 

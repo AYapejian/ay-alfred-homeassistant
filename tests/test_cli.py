@@ -812,48 +812,95 @@ class TestActionCommand:
 # ---------------------------------------------------------------------------
 
 
-class TestBuildAreaLookup:
-    def test_builds_lookup_from_registries(self) -> None:
-        from ha_workflow.cli import _build_area_lookup
-
+class TestBuildRegistryLookup:
+    def _mock_client(
+        self,
+        areas: list[dict[str, str]],
+        devices: list[dict[str, str]],
+        entities: list[dict[str, str]],
+    ) -> MagicMock:
         client = MagicMock()
-        client.get_area_registry.return_value = [
-            {"area_id": "living_room", "name": "Living Room"},
-            {"area_id": "kitchen", "name": "Kitchen"},
-        ]
-        client.get_entity_registry.return_value = [
-            {"entity_id": "light.living_room", "area_id": "living_room"},
-            {"entity_id": "switch.kitchen", "area_id": "kitchen"},
-            {"entity_id": "sensor.temp", "area_id": ""},
-        ]
+        client.get_area_registry.return_value = areas
+        client.get_device_registry.return_value = devices
+        client.get_entity_registry.return_value = entities
+        return client
 
-        lookup = _build_area_lookup(client)
+    def test_entity_direct_area(self) -> None:
+        """Entity with its own area_id resolves directly."""
+        from ha_workflow.cli import _build_registry_lookup
 
-        assert lookup == {
-            "light.living_room": "Living Room",
-            "switch.kitchen": "Kitchen",
-        }
-        # Entity with empty area_id should not appear
-        assert "sensor.temp" not in lookup
+        client = self._mock_client(
+            areas=[{"area_id": "kitchen", "name": "Kitchen"}],
+            devices=[],
+            entities=[
+                {"entity_id": "light.sink", "area_id": "kitchen", "device_id": ""},
+            ],
+        )
+        lookup = _build_registry_lookup(client)
+        assert lookup["light.sink"].area_name == "Kitchen"
+
+    def test_area_inherited_from_device(self) -> None:
+        """Entity without area_id inherits area from its device."""
+        from ha_workflow.cli import _build_registry_lookup
+
+        client = self._mock_client(
+            areas=[{"area_id": "living_room", "name": "Living Room"}],
+            devices=[{"id": "dev_1", "area_id": "living_room"}],
+            entities=[
+                {"entity_id": "light.lamp", "area_id": "", "device_id": "dev_1"},
+            ],
+        )
+        lookup = _build_registry_lookup(client)
+        assert lookup["light.lamp"].area_name == "Living Room"
+        assert lookup["light.lamp"].device_id == "dev_1"
+
+    def test_entity_area_overrides_device_area(self) -> None:
+        """Entity-level area_id takes priority over the device's area."""
+        from ha_workflow.cli import _build_registry_lookup
+
+        client = self._mock_client(
+            areas=[
+                {"area_id": "garage", "name": "Garage"},
+                {"area_id": "office", "name": "Office"},
+            ],
+            devices=[{"id": "dev_1", "area_id": "garage"}],
+            entities=[
+                {"entity_id": "light.desk", "area_id": "office", "device_id": "dev_1"},
+            ],
+        )
+        lookup = _build_registry_lookup(client)
+        assert lookup["light.desk"].area_name == "Office"
+
+    def test_device_id_stored(self) -> None:
+        """device_id is stored in the lookup even when there's no area."""
+        from ha_workflow.cli import _build_registry_lookup
+
+        client = self._mock_client(
+            areas=[],
+            devices=[],
+            entities=[
+                {"entity_id": "sensor.temp", "area_id": "", "device_id": "dev_99"},
+            ],
+        )
+        lookup = _build_registry_lookup(client)
+        assert lookup["sensor.temp"].device_id == "dev_99"
+        assert lookup["sensor.temp"].area_name == ""
 
     def test_empty_registries_returns_empty(self) -> None:
-        from ha_workflow.cli import _build_area_lookup
+        from ha_workflow.cli import _build_registry_lookup
 
-        client = MagicMock()
-        client.get_area_registry.return_value = []
-        client.get_entity_registry.return_value = []
-
-        assert _build_area_lookup(client) == {}
+        client = self._mock_client(areas=[], devices=[], entities=[])
+        assert _build_registry_lookup(client) == {}
 
     def test_unknown_area_id_skipped(self) -> None:
-        from ha_workflow.cli import _build_area_lookup
+        from ha_workflow.cli import _build_registry_lookup
 
-        client = MagicMock()
-        client.get_area_registry.return_value = [
-            {"area_id": "living_room", "name": "Living Room"},
-        ]
-        client.get_entity_registry.return_value = [
-            {"entity_id": "light.x", "area_id": "nonexistent"},
-        ]
-
-        assert _build_area_lookup(client) == {}
+        client = self._mock_client(
+            areas=[{"area_id": "living_room", "name": "Living Room"}],
+            devices=[],
+            entities=[
+                {"entity_id": "light.x", "area_id": "nonexistent", "device_id": ""},
+            ],
+        )
+        lookup = _build_registry_lookup(client)
+        assert lookup["light.x"].area_name == ""

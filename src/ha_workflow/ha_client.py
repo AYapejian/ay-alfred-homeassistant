@@ -114,6 +114,21 @@ class HAClient:
             pass
         return []
 
+    def get_device_registry(self) -> list[dict[str, Any]]:
+        """``GET /api/config/device_registry`` — device registry entries.
+
+        Returns a list of dicts with ``id``, ``area_id``, etc.
+        Requires HA 2022.6+.  Returns an empty list on failure so callers
+        can degrade gracefully.
+        """
+        try:
+            result = self._request("GET", "/api/config/device_registry")
+            if isinstance(result, list):
+                return result
+        except (HAConnectionError, HAAuthError):
+            pass
+        return []
+
     def get_area_registry(self) -> list[dict[str, Any]]:
         """``GET /api/config/area_registry`` — area registry entries.
 
