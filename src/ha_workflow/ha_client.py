@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import datetime
 import json
 import urllib.error
 import urllib.request
@@ -155,11 +156,9 @@ class HAClient:
         Returns a flat list of state-change dicts (newest last).
         Returns an empty list on failure.
         """
-        import datetime
-
         now = datetime.datetime.now(datetime.timezone.utc)
         start = now - datetime.timedelta(hours=hours)
-        start_str = start.strftime("%Y-%m-%dT%H:%M:%S") + "+00:00"
+        start_str = start.strftime("%Y-%m-%dT%H:%M:%S") + "Z"
 
         path = (
             f"/api/history/period/{start_str}"

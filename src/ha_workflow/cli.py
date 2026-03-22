@@ -7,6 +7,7 @@ Invoked as::
 
 from __future__ import annotations
 
+import calendar
 import os
 import subprocess
 import sys
@@ -646,7 +647,7 @@ def _format_relative_time(iso_timestamp: str) -> str:
     try:
         clean = iso_timestamp.split(".")[0].replace("Z", "")
         clean = clean.replace("+00:00", "")
-        ts = time.mktime(time.strptime(clean, "%Y-%m-%dT%H:%M:%S"))
+        ts = float(calendar.timegm(time.strptime(clean, "%Y-%m-%dT%H:%M:%S")))
         delta = time.time() - ts
         if delta < 0:
             return "just now"
