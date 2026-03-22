@@ -551,8 +551,6 @@ def _cmd_system_action(action: str) -> None:
                 sys.stdout.write("Error log is empty\n")
                 return
             # Copy to clipboard via pbcopy
-            import subprocess
-
             subprocess.run(["pbcopy"], input=log_text.encode("utf-8"), check=True)
             # Show a summary (first line + total size)
             first_line = log_text.strip().split("\n")[0][:80]
