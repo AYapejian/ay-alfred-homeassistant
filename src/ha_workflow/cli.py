@@ -724,17 +724,24 @@ def _cmd_copy_action(entity_id: str, action: str) -> None:
         sys.stdout.write(f"Unknown copy action: {action}\n")
         return
 
-    subprocess.run(["pbcopy"], input=text.encode("utf-8"), check=True)
+    try:
+        subprocess.run(["pbcopy"], input=text.encode("utf-8"), check=True)
+    except Exception as exc:
+        sys.stdout.write(f"Failed to copy to clipboard: {exc}\n")
+        return
     sys.stdout.write(msg + "\n")
 
 
 def _cmd_open_action(entity_id: str, action: str) -> None:
     """Handle open-in-Home-Assistant actions."""
+    import urllib.parse
+
     config = Config.from_env()
     ha_url = config.ha_url
+    safe_id = urllib.parse.quote(entity_id, safe="")
 
     if action == "open_entity":
-        url = f"{ha_url}/config/entities?filter={entity_id}"
+        url = f"{ha_url}/config/entities?filter={safe_id}"
     elif action == "open_device":
         client = HAClient(config)
         device_id = _lookup_device_id(client, entity_id)
@@ -750,12 +757,16 @@ def _cmd_open_action(entity_id: str, action: str) -> None:
             return
         url = f"{ha_url}/config/areas/area/{area_id}"
     elif action == "open_history":
-        url = f"{ha_url}/history?entity_id={entity_id}"
+        url = f"{ha_url}/history?entity_id={safe_id}"
     else:
         sys.stdout.write(f"Unknown open action: {action}\n")
         return
 
-    subprocess.run(["open", url], check=True)
+    try:
+        subprocess.run(["open", url], check=True)
+    except Exception as exc:
+        sys.stdout.write(f"Failed to open in browser: {exc}\n")
+        return
     sys.stdout.write("Opened in Home Assistant\n")
 
 
