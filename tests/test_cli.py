@@ -1244,14 +1244,31 @@ class TestActionsCommand:
         assert "Invalid entity ID" in data["items"][0]["title"]
         assert data["items"][0]["valid"] is False
 
-    def test_submenu_includes_advanced_stub(self, capsys: object) -> None:
+    def test_submenu_includes_advanced_action_call(self, capsys: object) -> None:
         main(["actions", "light.living_room"])
         out = capsys.readouterr().out  # type: ignore[union-attr]
         data = json.loads(out)
-        stub = [i for i in data["items"] if i["title"] == "Advanced Action Call"]
-        assert len(stub) == 1
-        assert stub[0]["valid"] is False
-        assert "Coming soon" in stub[0]["subtitle"]
+        adv = [i for i in data["items"] if "Advanced Action Call" in i["title"]]
+        assert len(adv) == 1
+        assert adv[0]["valid"] is False
+        assert "brightness" in adv[0]["subtitle"].lower()
+
+    def test_submenu_parameterized_hint(self, capsys: object) -> None:
+        """Turn On action for lights shows param hints in subtitle."""
+        main(["actions", "light.living_room"])
+        out = capsys.readouterr().out  # type: ignore[union-attr]
+        data = json.loads(out)
+        turn_on = [i for i in data["items"] if i.get("title") == "Turn On"]
+        assert len(turn_on) == 1
+        assert "brightness" in turn_on[0]["subtitle"].lower()
+
+    def test_submenu_no_advanced_for_sensor(self, capsys: object) -> None:
+        """Sensors have no actions, so no Advanced Action Call."""
+        main(["actions", "sensor.temperature"])
+        out = capsys.readouterr().out  # type: ignore[union-attr]
+        data = json.loads(out)
+        adv = [i for i in data["items"] if "Advanced Action Call" in i.get("title", "")]
+        assert len(adv) == 0
 
     def test_submenu_copy_entity_id(self, capsys: object) -> None:
         main(["actions", "light.living_room"])
@@ -1268,6 +1285,118 @@ class TestActionsCommand:
         items = [i for i in data["items"] if i["title"] == "Open History"]
         assert len(items) == 1
         assert items[0]["variables"]["action"] == "open_history"
+
+
+# ---------------------------------------------------------------------------
+# Parameterized actions
+# ---------------------------------------------------------------------------
+
+
+class TestActionWithParams:
+    @patch("ha_workflow.cli._cmd_record_usage")
+    @patch("ha_workflow.cli.dispatch_action")
+    @patch("ha_workflow.cli.HAClient")
+    @patch("ha_workflow.cli.Config.from_env")
+    def test_inline_params_passed(
+        self,
+        mock_from_env: MagicMock,
+        mock_ha_client: MagicMock,
+        mock_dispatch: MagicMock,
+        mock_record: MagicMock,
+        capsys: object,
+    ) -> None:
+        from ha_workflow.actions import ActionResult
+
+        mock_from_env.return_value = MagicMock()
+        mock_dispatch.return_value = ActionResult(success=True, message="Turned on")
+        main(["action", "light.bedroom", "turn_on", "brightness:128"])
+        mock_dispatch.assert_called_once()
+        call_args = mock_dispatch.call_args
+        assert call_args[1]["service_data"] == {"brightness": 128}
+
+    @patch("ha_workflow.cli._cmd_record_usage")
+    @patch("ha_workflow.cli.dispatch_action")
+    @patch("ha_workflow.cli.HAClient")
+    @patch("ha_workflow.cli.Config.from_env")
+    def test_inline_multiple_params(
+        self,
+        mock_from_env: MagicMock,
+        mock_ha_client: MagicMock,
+        mock_dispatch: MagicMock,
+        mock_record: MagicMock,
+        capsys: object,
+    ) -> None:
+        from ha_workflow.actions import ActionResult
+
+        mock_from_env.return_value = MagicMock()
+        mock_dispatch.return_value = ActionResult(success=True, message="Turned on")
+        main(
+            [
+                "action",
+                "light.bedroom",
+                "turn_on",
+                "brightness:50%,transition:2",
+            ]
+        )
+        call_args = mock_dispatch.call_args
+        sd = call_args[1]["service_data"]
+        assert sd["brightness"] == 128
+        assert sd["transition"] == 2.0
+
+    def test_inline_invalid_params_shows_error(self, capsys: object) -> None:
+        main(["action", "light.bedroom", "turn_on", "brightness:abc"])
+        out = capsys.readouterr().out  # type: ignore[union-attr]
+        assert "integer" in out.lower()
+
+
+class TestActionParamCommand:
+    def test_empty_query_lists_params(self, capsys: object) -> None:
+        main(["action-param", "light.bedroom", "turn_on"])
+        out = capsys.readouterr().out  # type: ignore[union-attr]
+        data = json.loads(out)
+        titles = [i["title"] for i in data["items"]]
+        assert any("Brightness" in t for t in titles)
+        assert any("Color Temp" in t for t in titles)
+
+    def test_valid_query_shows_confirmation(self, capsys: object) -> None:
+        main(
+            [
+                "action-param",
+                "light.bedroom",
+                "turn_on",
+                "brightness:128",
+            ]
+        )
+        out = capsys.readouterr().out  # type: ignore[union-attr]
+        data = json.loads(out)
+        assert data["items"][0]["valid"] is True
+        assert "brightness=128" in data["items"][0]["subtitle"]
+
+    def test_invalid_query_shows_error(self, capsys: object) -> None:
+        main(
+            [
+                "action-param",
+                "light.bedroom",
+                "turn_on",
+                "brightness:abc",
+            ]
+        )
+        out = capsys.readouterr().out  # type: ignore[union-attr]
+        data = json.loads(out)
+        assert data["items"][0]["valid"] is False
+        assert "Invalid" in data["items"][0]["title"]
+
+    def test_no_params_available(self, capsys: object) -> None:
+        main(["action-param", "light.bedroom", "toggle"])
+        out = capsys.readouterr().out  # type: ignore[union-attr]
+        data = json.loads(out)
+        assert "No parameters" in data["items"][0]["title"]
+
+    def test_missing_entity(self, capsys: object) -> None:
+        main(["action-param"])
+        out = capsys.readouterr().out  # type: ignore[union-attr]
+        data = json.loads(out)
+        assert "Missing" in data["items"][0]["title"]
 
 
 # ---------------------------------------------------------------------------

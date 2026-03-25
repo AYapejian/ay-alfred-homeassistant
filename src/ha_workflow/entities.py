@@ -215,7 +215,7 @@ DOMAIN_REGISTRY: dict[str, DomainConfig] = {
     ),
     "media_player": _DC(
         "toggle",
-        ("toggle", "media_play", "media_pause", "media_stop"),
+        ("toggle", "media_play", "media_pause", "media_stop", "volume_set"),
         "icons/media_player.png",
         _media_player_subtitle,
     ),
@@ -237,12 +237,20 @@ DOMAIN_REGISTRY: dict[str, DomainConfig] = {
     "person": _DC("", (), "icons/person.png", _default_subtitle),
     "zone": _DC("", (), "icons/zone.png", _default_subtitle),
     # Input helpers
-    "input_number": _DC("", (), "icons/input_number.png", _sensor_subtitle),
-    "input_select": _DC("", (), "icons/input_select.png", _default_subtitle),
-    "input_text": _DC("", (), "icons/input_text.png", _default_subtitle),
+    "input_number": _DC(
+        "set_value", ("set_value",), "icons/input_number.png", _sensor_subtitle
+    ),
+    "input_select": _DC(
+        "select_option", ("select_option",), "icons/input_select.png", _default_subtitle
+    ),
+    "input_text": _DC(
+        "set_value", ("set_value",), "icons/input_text.png", _default_subtitle
+    ),
     "input_datetime": _DC("", (), "icons/input_datetime.png", _default_subtitle),
-    "number": _DC("", (), "icons/number.png", _sensor_subtitle),
-    "select": _DC("", (), "icons/select.png", _default_subtitle),
+    "number": _DC("set_value", ("set_value",), "icons/number.png", _sensor_subtitle),
+    "select": _DC(
+        "select_option", ("select_option",), "icons/select.png", _default_subtitle
+    ),
     # Action entities
     "button": _DC("press", ("press",), "icons/button.png", _default_subtitle),
     "timer": _DC(
@@ -269,3 +277,84 @@ _UNKNOWN_DOMAIN = DomainConfig(
 def get_domain_config(domain: str) -> DomainConfig:
     """Return the :class:`DomainConfig` for *domain*, with a safe fallback."""
     return DOMAIN_REGISTRY.get(domain, _UNKNOWN_DOMAIN)
+
+
+# ---------------------------------------------------------------------------
+# Action parameter definitions
+# ---------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class ActionParam:
+    """Describes a single parameter for a parameterized HA service call."""
+
+    name: str  # HA service_data key (e.g. "brightness")
+    label: str  # Human-readable label ("Brightness")
+    type: str  # "int", "float", "str", "bool"
+    required: bool = False
+    min_value: Optional[float] = None
+    max_value: Optional[float] = None
+    hint: str = ""  # shown as Alfred subtitle ("0-255 or 0-100%")
+
+
+_AP = ActionParam  # shorthand
+
+ACTION_PARAMS: dict[tuple[str, str], tuple[ActionParam, ...]] = {
+    # --- Lights ---
+    ("light", "turn_on"): (
+        _AP("brightness", "Brightness", "int", hint="0-255 or 0-100%"),
+        _AP("color_temp_kelvin", "Color Temp", "int", hint="2000-6500 K"),
+        _AP("rgb_color", "RGB Color", "str", hint="R,G,B (e.g. 255,0,0)"),
+        _AP("color_name", "Color Name", "str", hint="e.g. red, blue, warm_white"),
+        _AP("effect", "Effect", "str", hint="Effect name"),
+        _AP("transition", "Transition", "float", hint="Seconds"),
+    ),
+    # --- Climate ---
+    ("climate", "set_temperature"): (
+        _AP("temperature", "Temperature", "float", required=True, hint="Target temp"),
+        _AP("hvac_mode", "HVAC Mode", "str", hint="heat, cool, auto, off"),
+    ),
+    # --- Cover ---
+    ("cover", "open_cover"): (
+        _AP("position", "Position", "int", hint="0-100", min_value=0, max_value=100),
+    ),
+    ("cover", "close_cover"): (
+        _AP("position", "Position", "int", hint="0-100", min_value=0, max_value=100),
+    ),
+    # --- Fan ---
+    ("fan", "turn_on"): (
+        _AP("percentage", "Speed", "int", hint="0-100", min_value=0, max_value=100),
+    ),
+    # --- Media player ---
+    ("media_player", "volume_set"): (
+        _AP(
+            "volume_level",
+            "Volume",
+            "float",
+            hint="0.0-1.0",
+            min_value=0.0,
+            max_value=1.0,
+        ),
+    ),
+    # --- Input helpers ---
+    ("input_number", "set_value"): (
+        _AP("value", "Value", "float", required=True, hint="New value"),
+    ),
+    ("input_select", "select_option"): (
+        _AP("option", "Option", "str", required=True, hint="Option to select"),
+    ),
+    ("input_text", "set_value"): (
+        _AP("value", "Value", "str", required=True, hint="New text"),
+    ),
+    ("number", "set_value"): (
+        _AP("value", "Value", "float", required=True, hint="New value"),
+    ),
+    ("select", "select_option"): (
+        _AP("option", "Option", "str", required=True, hint="Option to select"),
+    ),
+}
+
+
+def get_action_params(domain: str, action: str) -> tuple[ActionParam, ...]:
+    """Return parameter definitions for a domain/action pair, or empty tuple."""
+    return ACTION_PARAMS.get((domain, action), ())
