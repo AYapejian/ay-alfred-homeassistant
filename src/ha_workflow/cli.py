@@ -36,6 +36,11 @@ from ha_workflow.config import Config  # noqa: E402
 from ha_workflow.entities import Entity, get_domain_config  # noqa: E402
 from ha_workflow.errors import handle_error  # noqa: E402
 from ha_workflow.ha_client import HAClient  # noqa: E402
+from ha_workflow.notify import (  # noqa: E402
+    notify,
+    notify_background_error,
+    notify_error,
+)
 from ha_workflow.query_parser import ParsedQuery, parse_query  # noqa: E402
 from ha_workflow.search import fuzzy_search, regex_search  # noqa: E402
 from ha_workflow.suggestions import build_domain_suggestions  # noqa: E402
@@ -456,7 +461,15 @@ def _cmd_cache(args: list[str]) -> None:
     try:
         if sub == "refresh":
             _dbg(f"cache refresh: db={cache._db_path}")
-            _refresh_cache(config, cache)
+            try:
+                _refresh_cache(config, cache)
+            except Exception as exc:
+                # Background refresh — user may not see stderr, so toast it
+                notify_background_error(
+                    f"Cache refresh failed: {exc}",
+                    subtitle="Home Assistant may be unreachable",
+                )
+                raise
             # Clean up lock file (we may have been invoked as a background refresh)
             lock_path = config.cache_dir / _LOCK_FILENAME
             if lock_path.exists():
@@ -508,7 +521,7 @@ def _cmd_action(args: list[str]) -> None:
         return
 
     if not entity_id or not action:
-        sys.stdout.write("Missing entity_id or action\n")
+        notify_error("Missing entity_id or action")
         return
 
     # Viewer actions — copy detailed info to clipboard
@@ -530,10 +543,11 @@ def _cmd_action(args: list[str]) -> None:
     config = Config.from_env()
     client = HAClient(config)
     result = dispatch_action(client, entity_id, action)
-    sys.stdout.write(result.message + "\n")
-
     if result.success:
+        notify(result.message)
         _cmd_record_usage(entity_id)
+    else:
+        notify_error(result.message)
 
 
 def _cmd_system_action(action: str) -> None:
@@ -546,14 +560,14 @@ def _cmd_system_action(action: str) -> None:
             tracker.clear()
         finally:
             tracker.close()
-        sys.stdout.write("Usage history cleared\n")
+        notify("Usage history cleared")
 
     elif action == "cache_refresh":
         cache = open_cache(config)
         try:
             _refresh_cache(config, cache)
             count = len(cache.get_all())
-            sys.stdout.write(f"Cache refreshed: {count} entities\n")
+            notify(f"Cache refreshed: {count} entities")
         finally:
             cache.close()
 
@@ -561,9 +575,9 @@ def _cmd_system_action(action: str) -> None:
         client = HAClient(config)
         try:
             client.call_service("homeassistant", "restart")
-            sys.stdout.write("Home Assistant is restarting\n")
+            notify("Home Assistant is restarting")
         except Exception as exc:
-            sys.stdout.write(f"Restart failed: {exc}\n")
+            notify_error(f"Restart failed: {exc}")
 
     elif action == "ha_check_config":
         client = HAClient(config)
@@ -571,35 +585,41 @@ def _cmd_system_action(action: str) -> None:
             result = client.check_config()
             errors = result.get("errors")
             if errors:
-                sys.stdout.write(f"Config invalid: {errors}\n")
+                notify_error(f"Config invalid: {errors}")
             else:
-                sys.stdout.write("Configuration is valid\n")
+                notify("Configuration is valid")
         except Exception as exc:
-            sys.stdout.write(f"Config check failed: {exc}\n")
+            notify_error(f"Config check failed: {exc}")
 
     elif action == "ha_error_log":
         client = HAClient(config)
         try:
             log_text = client.get_error_log()
         except Exception as exc:
-            sys.stdout.write(f"Failed to fetch error log: {exc}\n")
+            msg = str(exc)
+            if "404" in msg:  # string match: HAClient embeds status code in message
+                notify_error(
+                    "Error log not available (endpoint returned 404). "
+                    "This endpoint is not supported via Nabu Casa cloud — "
+                    "use a local HA URL instead."
+                )
+            else:
+                notify_error(f"Failed to fetch error log: {exc}")
             return
         if not log_text or not log_text.strip():
-            sys.stdout.write("Error log is empty\n")
+            notify("Error log is empty")
             return
         try:
             subprocess.run(["pbcopy"], input=log_text.encode("utf-8"), check=True)
         except Exception as exc:
-            sys.stdout.write(f"Failed to copy log to clipboard: {exc}\n")
+            notify_error(f"Failed to copy log to clipboard: {exc}")
             return
         first_line = log_text.strip().split("\n")[0][:80]
         lines = log_text.strip().count("\n") + 1
-        sys.stdout.write(
-            f"Error log copied to clipboard ({lines} lines): {first_line}\n"
-        )
+        notify(f"Error log copied ({lines} lines): {first_line}")
 
     else:
-        sys.stdout.write(f"Unknown system action: {action}\n")
+        notify_error(f"Unknown system action: {action}")
 
 
 # ---------------------------------------------------------------------------
@@ -712,24 +732,24 @@ def _cmd_copy_action(entity_id: str, action: str) -> None:
         client = HAClient(config)
         device_id = _lookup_device_id(client, entity_id)
         if not device_id:
-            sys.stdout.write(f"No device found for {entity_id}\n")
+            notify_error(f"No device found for {entity_id}")
             return
         device = _lookup_device(client, device_id)
         if not device:
-            sys.stdout.write(f"Device {device_id} not found\n")
+            notify_error(f"Device {device_id} not found")
             return
         text = _format_as_yaml(device)
         msg = f"Copied device details for {entity_id}"
     else:
-        sys.stdout.write(f"Unknown copy action: {action}\n")
+        notify_error(f"Unknown copy action: {action}")
         return
 
     try:
         subprocess.run(["pbcopy"], input=text.encode("utf-8"), check=True)
     except Exception as exc:
-        sys.stdout.write(f"Failed to copy to clipboard: {exc}\n")
+        notify_error(f"Failed to copy to clipboard: {exc}")
         return
-    sys.stdout.write(msg + "\n")
+    notify(msg)
 
 
 def _cmd_open_action(entity_id: str, action: str) -> None:
@@ -746,28 +766,28 @@ def _cmd_open_action(entity_id: str, action: str) -> None:
         client = HAClient(config)
         device_id = _lookup_device_id(client, entity_id)
         if not device_id:
-            sys.stdout.write(f"No device found for {entity_id}\n")
+            notify_error(f"No device found for {entity_id}")
             return
         url = f"{ha_url}/config/devices/device/{device_id}"
     elif action == "open_area":
         client = HAClient(config)
         area_id = _lookup_area_id(client, entity_id)
         if not area_id:
-            sys.stdout.write(f"No area found for {entity_id}\n")
+            notify_error(f"No area found for {entity_id}")
             return
         url = f"{ha_url}/config/areas/area/{area_id}"
     elif action == "open_history":
         url = f"{ha_url}/history?entity_id={safe_id}"
     else:
-        sys.stdout.write(f"Unknown open action: {action}\n")
+        notify_error(f"Unknown open action: {action}")
         return
 
     try:
         subprocess.run(["open", url], check=True)
     except Exception as exc:
-        sys.stdout.write(f"Failed to open in browser: {exc}\n")
+        notify_error(f"Failed to open in browser: {exc}")
         return
-    sys.stdout.write("Opened in Home Assistant\n")
+    notify("Opened in Home Assistant")
 
 
 def _lookup_device_id(client: HAClient, entity_id: str) -> str:
@@ -815,9 +835,9 @@ def _cmd_show_details(entity_id: str) -> None:
         friendly = state.get("attributes", {}).get("friendly_name", entity_id)
         subprocess.run(["pbcopy"], input=text.encode("utf-8"), check=True)
         current_state = state.get("state", "unknown")
-        sys.stdout.write(f"Copied details for {friendly} ({current_state})\n")
+        notify(f"Copied details for {friendly} ({current_state})")
     except Exception as exc:
-        sys.stdout.write(f"Failed to fetch details: {exc}\n")
+        notify_error(f"Failed to fetch details: {exc}")
 
 
 def _cmd_view_history(entity_id: str) -> None:
@@ -827,16 +847,16 @@ def _cmd_view_history(entity_id: str) -> None:
     try:
         changes = client.get_history(entity_id, hours=1)
         if not changes:
-            sys.stdout.write(f"No history found for {entity_id} (last hour)\n")
+            notify("No history found (last hour)", subtitle=entity_id)
             return
         lines = [f"History for {entity_id} (last hour)", ""]
         for entry in changes:
             lines.append(_format_history_entry(entry))
         text = "\n".join(lines)
         subprocess.run(["pbcopy"], input=text.encode("utf-8"), check=True)
-        sys.stdout.write(f"History copied ({len(changes)} state changes)\n")
+        notify(f"History copied ({len(changes)} state changes)")
     except Exception as exc:
-        sys.stdout.write(f"Failed to fetch history: {exc}\n")
+        notify_error(f"Failed to fetch history: {exc}")
 
 
 def _cmd_actions(args: list[str]) -> None:

@@ -1050,7 +1050,7 @@ class TestActionCommand:
         assert call_args[0][0] == ["pbcopy"]
         assert b"Something broke" in call_args[1]["input"]
         out = capsys.readouterr().out  # type: ignore[union-attr]
-        assert "copied to clipboard" in out.lower()
+        assert "copied" in out.lower()
         assert "2 lines" in out
 
     @patch("ha_workflow.cli.HAClient")
