@@ -597,7 +597,7 @@ def _cmd_system_action(action: str) -> None:
             log_text = client.get_error_log()
         except Exception as exc:
             msg = str(exc)
-            if "404" in msg:
+            if "404" in msg:  # string match: HAClient embeds status code in message
                 notify_error(
                     "Error log not available (endpoint returned 404). "
                     "This endpoint is not supported via Nabu Casa cloud — "
@@ -616,7 +616,7 @@ def _cmd_system_action(action: str) -> None:
             return
         first_line = log_text.strip().split("\n")[0][:80]
         lines = log_text.strip().count("\n") + 1
-        notify(f"Error log copied ({lines} lines)", subtitle=first_line)
+        notify(f"Error log copied ({lines} lines): {first_line}")
 
     else:
         notify_error(f"Unknown system action: {action}")

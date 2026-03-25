@@ -23,6 +23,9 @@ class TestEscapeApplescript:
     def test_backslash(self) -> None:
         assert _escape_applescript("path\\to") == "path\\\\to"
 
+    def test_newline_replaced(self) -> None:
+        assert _escape_applescript("line1\nline2") == "line1 line2"
+
 
 class TestForegroundNotify:
     """Foreground functions write to stdout only — no macOS toast."""

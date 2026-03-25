@@ -24,7 +24,7 @@ _TITLE = "Home Assistant"
 
 def _escape_applescript(s: str) -> str:
     """Escape a string for AppleScript double-quoted context."""
-    return s.replace("\\", "\\\\").replace('"', '\\"')
+    return s.replace("\\", "\\\\").replace('"', '\\"').replace("\n", " ")
 
 
 def _macos_notification(
