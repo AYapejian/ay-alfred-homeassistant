@@ -33,7 +33,11 @@ from ha_workflow.alfred import (  # noqa: E402
 )
 from ha_workflow.cache import EntityCache, open_cache  # noqa: E402
 from ha_workflow.config import Config  # noqa: E402
-from ha_workflow.entities import Entity, get_domain_config  # noqa: E402
+from ha_workflow.entities import (  # noqa: E402
+    Entity,
+    get_action_params,
+    get_domain_config,
+)
 from ha_workflow.errors import handle_error  # noqa: E402
 from ha_workflow.ha_client import HAClient  # noqa: E402
 from ha_workflow.notify import (  # noqa: E402
@@ -41,6 +45,7 @@ from ha_workflow.notify import (  # noqa: E402
     notify_background_error,
     notify_error,
 )
+from ha_workflow.params import parse_service_params  # noqa: E402
 from ha_workflow.query_parser import ParsedQuery, parse_query  # noqa: E402
 from ha_workflow.search import fuzzy_search, regex_search  # noqa: E402
 from ha_workflow.suggestions import build_domain_suggestions  # noqa: E402
@@ -540,9 +545,20 @@ def _cmd_action(args: list[str]) -> None:
         _cmd_open_action(entity_id, action)
         return
 
+    # Parse optional inline service params (e.g. "brightness:50,transition:2")
+    raw_params = args[2] if len(args) > 2 else ""
+    domain = entity_id.split(".")[0] if "." in entity_id else ""
+    service_data: Optional[dict[str, object]] = None
+    if raw_params:
+        try:
+            service_data = parse_service_params(raw_params, domain, action)
+        except ValueError as exc:
+            notify_error(str(exc))
+            return
+
     config = Config.from_env()
     client = HAClient(config)
-    result = dispatch_action(client, entity_id, action)
+    result = dispatch_action(client, entity_id, action, service_data=service_data)
     if result.success:
         notify(result.message)
         _cmd_record_usage(entity_id)
@@ -924,10 +940,16 @@ def _cmd_actions(args: list[str]) -> None:
     # --- Domain actions ---
     for action in dc.available_actions:
         label = action.replace("_", " ").title()
+        params = get_action_params(domain, action)
+        if params:
+            param_hints = ", ".join(p.label.lower() for p in params)
+            subtitle = f"{friendly} \u00b7 supports: {param_hints}"
+        else:
+            subtitle = f"{friendly} \u00b7 {domain}"
         items.append(
             AlfredItem(
                 title=label,
-                subtitle=f"{friendly} \u00b7 {domain}",
+                subtitle=subtitle,
                 icon=AlfredIcon(path=dc.icon_path),
                 variables={
                     "entity_id": entity_id,
@@ -1040,15 +1062,134 @@ def _cmd_actions(args: list[str]) -> None:
         )
     )
 
-    # --- Advanced Action Call (stub) ---
-    items.append(
-        AlfredItem(
-            title="Advanced Action Call",
-            subtitle=f"Coming soon \u2014 advanced controls for {domain} entities",
-            icon=AlfredIcon(path=dc.icon_path),
-            valid=False,
+    # --- Advanced Action Call (parameterized) ---
+    if dc.available_actions:
+        # Find all params available for this domain's actions
+        all_params: list[str] = []
+        for act in dc.available_actions:
+            for p in get_action_params(domain, act):
+                if p.name not in all_params:
+                    all_params.append(p.name)
+        if all_params:
+            hint_str = ", ".join(all_params[:4])
+            if len(all_params) > 4:
+                hint_str += ", \u2026"
+            items.append(
+                AlfredItem(
+                    title="Advanced Action Call\u2026",
+                    subtitle=f"e.g. brightness:50%,transition:2 \u00b7 {hint_str}",
+                    icon=AlfredIcon(path=dc.icon_path),
+                    variables={
+                        "entity_id": entity_id,
+                        "action": "action_param",
+                        "domain": domain,
+                    },
+                    valid=False,
+                )
+            )
+
+    output = AlfredOutput(items=items)
+    sys.stdout.write(output.to_json() + "\n")
+
+
+def _cmd_action_param(args: list[str]) -> None:
+    """Interactive parameter entry for Alfred query continuation.
+
+    Usage: ``cli.py action-param <entity_id> <action> [query]``
+
+    When *query* is empty, lists available parameters.  When *query*
+    contains ``key:value`` pairs, validates and shows a confirmation item.
+    """
+    entity_id = args[0] if args else ""
+    action = args[1] if len(args) > 1 else ""
+    query = args[2] if len(args) > 2 else ""
+
+    domain = entity_id.split(".")[0] if "." in entity_id else ""
+    if not entity_id or not action or not domain:
+        output = AlfredOutput(
+            items=[AlfredItem(title="Missing entity or action", valid=False)]
         )
-    )
+        sys.stdout.write(output.to_json() + "\n")
+        return
+
+    params = get_action_params(domain, action)
+    dc = get_domain_config(domain)
+    friendly = entity_id.split(".", 1)[1].replace("_", " ").title()
+
+    items: list[AlfredItem] = []
+
+    if not query:
+        # Show available parameters as hints
+        if not params:
+            items.append(
+                AlfredItem(
+                    title="No parameters available",
+                    subtitle=f"{action} for {domain} has no configurable parameters",
+                    valid=False,
+                )
+            )
+        else:
+            items.append(
+                AlfredItem(
+                    title=f"Set parameters for {action.replace('_', ' ')}",
+                    subtitle="Type key:value pairs (e.g. brightness:50%,transition:2)",
+                    icon=AlfredIcon(path=dc.icon_path),
+                    valid=False,
+                )
+            )
+            for p in params:
+                req = " (required)" if p.required else ""
+                items.append(
+                    AlfredItem(
+                        title=f"{p.label}{req}",
+                        subtitle=(
+                            f"{p.name}:<value> \u00b7 {p.hint}"
+                            if p.hint
+                            else f"{p.name}:<value>"
+                        ),
+                        icon=AlfredIcon(path=dc.icon_path),
+                        valid=False,
+                        autocomplete=f"{p.name}:",
+                    )
+                )
+    else:
+        # Try to parse the query as params
+        try:
+            parsed = parse_service_params(query, domain, action)
+        except ValueError as exc:
+            items.append(
+                AlfredItem(
+                    title="Invalid parameters",
+                    subtitle=str(exc),
+                    icon=AlfredIcon(path=dc.icon_path),
+                    valid=False,
+                )
+            )
+        else:
+            if not parsed:
+                items.append(
+                    AlfredItem(
+                        title="No parameters parsed",
+                        subtitle="Type key:value pairs separated by commas",
+                        valid=False,
+                    )
+                )
+            else:
+                summary = ", ".join(f"{k}={v}" for k, v in parsed.items())
+                items.append(
+                    AlfredItem(
+                        title=f"{action.replace('_', ' ').title()} {friendly}",
+                        subtitle=summary,
+                        icon=AlfredIcon(path=dc.icon_path),
+                        variables={
+                            "entity_id": entity_id,
+                            "action": action,
+                            "domain": domain,
+                            "params": query,
+                        },
+                        valid=True,
+                    )
+                )
 
     output = AlfredOutput(items=items)
     sys.stdout.write(output.to_json() + "\n")
@@ -1105,6 +1246,8 @@ def main(argv: Optional[list[str]] = None) -> None:
         _cmd_action(args[1:])
     elif command == "actions":
         _cmd_actions(args[1:])
+    elif command == "action-param":
+        _cmd_action_param(args[1:])
     elif command == "record-usage":
         entity_id = args[1] if len(args) > 1 else ""
         _cmd_record_usage(entity_id)

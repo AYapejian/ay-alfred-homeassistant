@@ -52,6 +52,9 @@ def _action_label(action: str) -> str:
         "media_pause": "Paused",
         "media_stop": "Stopped",
         "set_temperature": "Temperature set",
+        "set_value": "Value set",
+        "select_option": "Option selected",
+        "volume_set": "Volume set",
     }
     return past.get(action, action.replace("_", " ").title())
 
