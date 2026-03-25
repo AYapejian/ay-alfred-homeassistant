@@ -316,14 +316,14 @@ ACTION_PARAMS: dict[tuple[str, str], tuple[ActionParam, ...]] = {
     ),
     # --- Cover ---
     ("cover", "open_cover"): (
-        _AP("position", "Position", "int", hint="0-100%", min_value=0, max_value=100),
+        _AP("position", "Position", "int", hint="0-100", min_value=0, max_value=100),
     ),
     ("cover", "close_cover"): (
-        _AP("position", "Position", "int", hint="0-100%", min_value=0, max_value=100),
+        _AP("position", "Position", "int", hint="0-100", min_value=0, max_value=100),
     ),
     # --- Fan ---
     ("fan", "turn_on"): (
-        _AP("percentage", "Speed", "int", hint="0-100%", min_value=0, max_value=100),
+        _AP("percentage", "Speed", "int", hint="0-100", min_value=0, max_value=100),
     ),
     # --- Media player ---
     ("media_player", "volume_set"): (
