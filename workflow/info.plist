@@ -191,7 +191,7 @@
 				<key>script</key>
 				<string>/usr/bin/python3 ha_workflow/cli.py actions "$entity_id" "{query}"</string>
 				<key>scriptargtype</key>
-				<integer>1</integer>
+				<integer>0</integer>
 				<key>scriptfile</key>
 				<string></string>
 				<key>subtext</key>
