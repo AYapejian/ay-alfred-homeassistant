@@ -553,8 +553,17 @@ def _cmd_action(args: list[str]) -> None:
         )
         return
 
-    # Parse optional inline service params (e.g. "brightness:50,transition:2")
-    raw_params = args[2] if len(args) > 2 else ""
+    # Decode params encoded into action as "action_name::param_str".
+    # This is the primary way params are passed from the actions sub-menu
+    # (because Alfred does not reliably propagate a $params variable from a
+    # linked Script Filter to a downstream Action node, but $action always
+    # propagates correctly).
+    encoded_params = ""
+    if "::" in action:
+        action, encoded_params = action.split("::", 1)
+
+    # Fall back to the legacy $params argument (args[2]) if no encoded params.
+    raw_params = encoded_params or (args[2] if len(args) > 2 else "")
     domain = entity_id.split(".")[0] if "." in entity_id else ""
     service_data: Optional[dict[str, object]] = None
     if raw_params:
@@ -1124,6 +1133,25 @@ def _cmd_actions(args: list[str]) -> None:
     sys.stdout.write(output.to_json() + "\n")
 
 
+def _format_param_summary(parsed: dict[str, object]) -> str:
+    """Build a human-readable summary of parsed service params.
+
+    For ``brightness``, appends a percentage annotation so users know the
+    0-255 scale is in effect (e.g. ``brightness:30`` → ``brightness=30 (≈12%)``).
+    Use ``brightness:30%`` to specify 30 percent directly.
+    """
+    parts: list[str] = []
+    for k, v in parsed.items():
+        if k == "brightness" and isinstance(v, int):
+            pct = round(v / 255 * 100)
+            tip = "use brightness:30% for 30%"
+            hint = f"brightness={v}/255 (\u2248{pct}%) \u00b7 {tip}"
+            parts.append(hint)
+        else:
+            parts.append(f"{k}={v}")
+    return ", ".join(parts)
+
+
 def _cmd_actions_param_entry(
     entity_id: str,
     domain: str,
@@ -1135,7 +1163,8 @@ def _cmd_actions_param_entry(
 
     Called when the user types ``key:value`` pairs in the actions sub-menu.
     Resolves the target action, validates params, and shows a confirmation
-    item that routes to ``run-script-action`` with the ``params`` variable.
+    item that routes to ``run-script-action`` with the ``action`` variable
+    carrying encoded params as ``action::param_str``.
     """
     items: list[AlfredItem] = []
 
@@ -1227,7 +1256,7 @@ def _cmd_actions_param_entry(
 
     # Show confirmation item
     action_label = action.replace("_", " ").title()
-    summary = ", ".join(f"{k}={v}" for k, v in parsed.items())
+    summary = _format_param_summary(parsed)
     items.append(
         AlfredItem(
             title=f"\u21b5 {action_label} {friendly}",
@@ -1236,9 +1265,11 @@ def _cmd_actions_param_entry(
             arg=entity_id,
             variables={
                 "entity_id": entity_id,
-                "action": action,
+                # Encode params into action so Alfred reliably forwards them:
+                # $action always propagates from linked script filters;
+                # $params does not always reach downstream action nodes.
+                "action": f"{action}::{param_str}",
                 "domain": domain,
-                "params": param_str,
             },
             valid=True,
         )
@@ -1342,7 +1373,7 @@ def _cmd_action_param(args: list[str]) -> None:
                     )
                 )
             else:
-                summary = ", ".join(f"{k}={v}" for k, v in parsed.items())
+                summary = _format_param_summary(parsed)
                 items.append(
                     AlfredItem(
                         title=f"{action.replace('_', ' ').title()} {friendly}",
@@ -1350,9 +1381,8 @@ def _cmd_action_param(args: list[str]) -> None:
                         icon=AlfredIcon(path=dc.icon_path),
                         variables={
                             "entity_id": entity_id,
-                            "action": action,
+                            "action": f"{action}::{query}",
                             "domain": domain,
-                            "params": query,
                         },
                         valid=True,
                     )

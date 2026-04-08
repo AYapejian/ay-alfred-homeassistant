@@ -76,7 +76,7 @@
 				<key>escaping</key>
 				<integer>0</integer>
 				<key>script</key>
-				<string>/usr/bin/python3 ha_workflow/cli.py action "$entity_id" "$action" "$params"</string>
+				<string>/usr/bin/python3 ha_workflow/cli.py action "$entity_id" "$action"</string>
 				<key>scriptargtype</key>
 				<integer>1</integer>
 				<key>scriptfile</key>
@@ -211,11 +211,6 @@
 			<integer>3</integer>
 		</dict>
 	</array>
-	<key>variables</key>
-	<dict>
-		<key>params</key>
-		<string></string>
-	</dict>
 	<key>readme</key>
 	<string>Alfred workflow for Home Assistant. Search entities, execute actions, and manage your smart home from Alfred.
 
@@ -228,30 +223,30 @@ Configuration:
 		<key>notification-action-result</key>
 		<dict>
 			<key>xpos</key>
-			<real>700</real>
+			<real>700.0</real>
 			<key>ypos</key>
-			<real>200</real>
+			<real>200.0</real>
 		</dict>
 		<key>run-script-action</key>
 		<dict>
 			<key>xpos</key>
-			<real>400</real>
+			<real>400.0</real>
 			<key>ypos</key>
-			<real>200</real>
+			<real>200.0</real>
 		</dict>
 		<key>script-filter-actions</key>
 		<dict>
 			<key>xpos</key>
-			<real>400</real>
+			<real>400.0</real>
 			<key>ypos</key>
-			<real>400</real>
+			<real>400.0</real>
 		</dict>
 		<key>script-filter-search</key>
 		<dict>
 			<key>xpos</key>
-			<real>100</real>
+			<real>100.0</real>
 			<key>ypos</key>
-			<real>200</real>
+			<real>200.0</real>
 		</dict>
 	</dict>
 	<key>userconfigurationconfig</key>
@@ -320,6 +315,11 @@ Configuration:
 			<string>CACHE_TTL</string>
 		</dict>
 	</array>
+	<key>variables</key>
+	<dict>
+		<key>params</key>
+		<string></string>
+	</dict>
 	<key>version</key>
 	<string>0.1.0</string>
 </dict>

@@ -1324,7 +1324,7 @@ class TestActionsCommandParamEntry:
     def test_confirmation_item_valid_with_arg_and_vars(
         self, capsys: object
     ) -> None:
-        """Typing key:value shows a valid confirmation item with all variables."""
+        """Confirmation item encodes params into action as 'action::params'."""
         main(["actions", "light.living_room", "brightness:128"])
         out = capsys.readouterr().out  # type: ignore[union-attr]
         data = json.loads(out)
@@ -1333,9 +1333,11 @@ class TestActionsCommandParamEntry:
         item = valid_items[0]
         assert item["arg"] == "light.living_room"
         assert item["variables"]["entity_id"] == "light.living_room"
-        assert item["variables"]["action"] == "turn_on"
+        # Params are encoded into action as "turn_on::brightness:128" so they
+        # travel through the confirmed-working $action variable channel.
+        assert item["variables"]["action"] == "turn_on::brightness:128"
         assert item["variables"]["domain"] == "light"
-        assert item["variables"]["params"] == "brightness:128"
+        assert "params" not in item["variables"]
 
     def test_confirmation_subtitle_shows_parsed_values(
         self, capsys: object
@@ -1378,8 +1380,7 @@ class TestActionsCommandParamEntry:
         valid_items = [i for i in data["items"] if i.get("valid")]
         assert len(valid_items) == 1
         item = valid_items[0]
-        assert item["variables"]["action"] == "turn_on"
-        assert item["variables"]["params"] == "brightness:50"
+        assert item["variables"]["action"] == "turn_on::brightness:50"
         assert item["arg"] == "light.living_room"
 
     def test_percentage_brightness_roundtrip(self, capsys: object) -> None:
@@ -1453,6 +1454,49 @@ class TestActionWithParams:
         out = capsys.readouterr().out  # type: ignore[union-attr]
         assert "integer" in out.lower()
 
+    @patch("ha_workflow.cli._cmd_record_usage")
+    @patch("ha_workflow.cli.dispatch_action")
+    @patch("ha_workflow.cli.HAClient")
+    @patch("ha_workflow.cli.Config.from_env")
+    def test_encoded_params_in_action_decoded(
+        self,
+        mock_from_env: MagicMock,
+        mock_ha_client: MagicMock,
+        mock_dispatch: MagicMock,
+        mock_record: MagicMock,
+        capsys: object,
+    ) -> None:
+        """Action variable 'turn_on::brightness:128' is decoded and dispatched."""
+        from ha_workflow.actions import ActionResult
+
+        mock_from_env.return_value = MagicMock()
+        mock_dispatch.return_value = ActionResult(success=True, message="Turned on")
+        # Simulate Alfred passing the encoded action (no $params arg)
+        main(["action", "light.bedroom", "turn_on::brightness:128"])
+        mock_dispatch.assert_called_once()
+        call_args = mock_dispatch.call_args
+        assert call_args[1]["service_data"] == {"brightness": 128}
+
+    @patch("ha_workflow.cli._cmd_record_usage")
+    @patch("ha_workflow.cli.dispatch_action")
+    @patch("ha_workflow.cli.HAClient")
+    @patch("ha_workflow.cli.Config.from_env")
+    def test_encoded_params_override_args_params(
+        self,
+        mock_from_env: MagicMock,
+        mock_ha_client: MagicMock,
+        mock_dispatch: MagicMock,
+        mock_record: MagicMock,
+        capsys: object,
+    ) -> None:
+        """Encoded params in action take priority over the legacy args[2] slot."""
+        from ha_workflow.actions import ActionResult
+
+        mock_from_env.return_value = MagicMock()
+        mock_dispatch.return_value = ActionResult(success=True, message="Turned on")
+        main(["action", "light.bedroom", "turn_on::brightness:200", "brightness:50"])
+        call_args = mock_dispatch.call_args
+        assert call_args[1]["service_data"] == {"brightness": 200}
 
 class TestActionParamCommand:
     def test_empty_query_lists_params(self, capsys: object) -> None:
@@ -1476,6 +1520,7 @@ class TestActionParamCommand:
         data = json.loads(out)
         assert data["items"][0]["valid"] is True
         assert "brightness=128" in data["items"][0]["subtitle"]
+        assert data["items"][0]["variables"]["action"] == "turn_on::brightness:128"
 
     def test_invalid_query_shows_error(self, capsys: object) -> None:
         main(
