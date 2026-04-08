@@ -1321,9 +1321,7 @@ class TestActionsCommand:
 
 
 class TestActionsCommandParamEntry:
-    def test_confirmation_item_valid_with_arg_and_vars(
-        self, capsys: object
-    ) -> None:
+    def test_confirmation_item_valid_with_arg_and_vars(self, capsys: object) -> None:
         """Confirmation item encodes params into action as 'action::params'."""
         main(["actions", "light.living_room", "brightness:128"])
         out = capsys.readouterr().out  # type: ignore[union-attr]
@@ -1339,9 +1337,7 @@ class TestActionsCommandParamEntry:
         assert item["variables"]["domain"] == "light"
         assert "params" not in item["variables"]
 
-    def test_confirmation_subtitle_shows_parsed_values(
-        self, capsys: object
-    ) -> None:
+    def test_confirmation_subtitle_shows_parsed_values(self, capsys: object) -> None:
         main(["actions", "light.living_room", "brightness:128"])
         out = capsys.readouterr().out  # type: ignore[union-attr]
         data = json.loads(out)
@@ -1497,6 +1493,7 @@ class TestActionWithParams:
         main(["action", "light.bedroom", "turn_on::brightness:200", "brightness:50"])
         call_args = mock_dispatch.call_args
         assert call_args[1]["service_data"] == {"brightness": 200}
+
 
 class TestActionParamCommand:
     def test_empty_query_lists_params(self, capsys: object) -> None:

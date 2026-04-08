@@ -17,20 +17,22 @@ An [Alfred](https://www.alfredapp.com/) workflow for macOS that brings [Home Ass
 
 This is a native macOS Alfred workflow — not a Home Assistant add-on. It runs entirely on your Mac and talks to HA over its REST API.
 
-**Working today:**
+**Features:**
 
 - Fuzzy search across all HA entities (by entity ID, friendly name, or attributes)
 - Domain filtering (e.g., `light:bedroom` to search only lights)
 - Regex search (e.g., `/.*kitchen.*/` for pattern matching)
 - Usage-based ranking — frequently used entities float to the top
+- Action execution — toggle lights, activate scenes, call services directly from Alfred
+- Action sub-menu via Cmd modifier with domain-aware actions
+- Parameterized actions — set brightness, color temp, etc. with inline `key:value` syntax
+- Copy entity ID/details, open entity or history in HA
+- HA system commands — restart, check config, view error log
 - System commands (cache refresh, clear usage data) accessible from search
 - Cached entity index in SQLite for fast, offline-capable lookups
 
 **Planned:**
 
-- Action execution — toggle lights, activate scenes, call services directly from Alfred
-- Action sub-menu via Cmd modifier
-- HA system commands — restart, check config, view logs
 - Real-time cache updates via WebSocket (currently pull-based)
 
 ## Requirements
@@ -48,6 +50,12 @@ This is a native macOS Alfred workflow — not a Home Assistant add-on. It runs 
    - `HA_URL` — your Home Assistant URL (e.g., `http://homeassistant.local:8123`)
    - `HA_TOKEN` — your long-lived access token
 4. Type `ha` in Alfred followed by your search query
+
+## Usage
+
+- `ha <query>` — search entities. **Enter** runs the default action (toggle, turn on/off, etc.)
+- **Cmd + Enter** — open the action sub-menu for the selected entity
+- In the action sub-menu, select **Set Params...** to enter parameters like `brightness:100` or `color_temp_kelvin:3000`
 
 ## Development
 
