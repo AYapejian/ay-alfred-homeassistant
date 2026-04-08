@@ -76,7 +76,7 @@
 				<key>escaping</key>
 				<integer>0</integer>
 				<key>script</key>
-				<string>/usr/bin/python3 ha_workflow/cli.py action "$entity_id" "$action"</string>
+				<string>/usr/bin/python3 ha_workflow/cli.py action "$entity_id" "$action" "$params"</string>
 				<key>scriptargtype</key>
 				<integer>1</integer>
 				<key>scriptfile</key>
@@ -189,7 +189,7 @@
 				<key>runningsubtext</key>
 				<string>Loading actions...</string>
 				<key>script</key>
-				<string>/usr/bin/python3 ha_workflow/cli.py actions "$entity_id"</string>
+				<string>/usr/bin/python3 ha_workflow/cli.py actions "$entity_id" "{query}"</string>
 				<key>scriptargtype</key>
 				<integer>1</integer>
 				<key>scriptfile</key>
@@ -211,6 +211,11 @@
 			<integer>3</integer>
 		</dict>
 	</array>
+	<key>variables</key>
+	<dict>
+		<key>params</key>
+		<string></string>
+	</dict>
 	<key>readme</key>
 	<string>Alfred workflow for Home Assistant. Search entities, execute actions, and manage your smart home from Alfred.
 

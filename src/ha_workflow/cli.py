@@ -34,6 +34,7 @@ from ha_workflow.alfred import (  # noqa: E402
 from ha_workflow.cache import EntityCache, open_cache  # noqa: E402
 from ha_workflow.config import Config  # noqa: E402
 from ha_workflow.entities import (  # noqa: E402
+    DomainConfig,
     Entity,
     get_action_params,
     get_domain_config,
@@ -545,6 +546,13 @@ def _cmd_action(args: list[str]) -> None:
         _cmd_open_action(entity_id, action)
         return
 
+    # Guard: action_param is a UI routing pseudo-action, not executable
+    if action == "action_param":
+        notify_error(
+            "Parameter entry was not completed. Use the actions menu to set parameters."
+        )
+        return
+
     # Parse optional inline service params (e.g. "brightness:50,transition:2")
     raw_params = args[2] if len(args) > 2 else ""
     domain = entity_id.split(".")[0] if "." in entity_id else ""
@@ -879,9 +887,10 @@ def _cmd_actions(args: list[str]) -> None:
     """List available actions for an entity (Cmd modifier sub-menu).
 
     Shows: entity header, domain actions, copy actions, open-in-HA actions,
-    and an advanced action call stub.
+    and inline parameter entry when the user types key:value pairs.
     """
     entity_id = args[0] if args else ""
+    query = args[1].strip() if len(args) > 1 else ""
     if not entity_id:
         output = AlfredOutput(
             items=[AlfredItem(title="No entity selected", valid=False)]
@@ -921,6 +930,13 @@ def _cmd_actions(args: list[str]) -> None:
     area_name = entity.area_name if entity else ""
     device_id = entity.device_id if entity else ""
 
+    # --- Inline parameter entry mode ---
+    # When the user types key:value pairs in the actions query field,
+    # switch to param confirmation mode instead of showing the menu.
+    if query and ":" in query:
+        _cmd_actions_param_entry(entity_id, domain, dc, friendly, query)
+        return
+
     items: list[AlfredItem] = []
 
     # --- Header item (not actionable) ---
@@ -951,10 +967,12 @@ def _cmd_actions(args: list[str]) -> None:
                 title=label,
                 subtitle=subtitle,
                 icon=AlfredIcon(path=dc.icon_path),
+                arg=entity_id,
                 variables={
                     "entity_id": entity_id,
                     "action": action,
                     "domain": domain,
+                    "params": "",
                 },
                 valid=True,
             )
@@ -966,10 +984,12 @@ def _cmd_actions(args: list[str]) -> None:
             title="Copy Entity ID",
             subtitle=entity_id,
             icon=_SYSTEM_ICON,
+            arg=entity_id,
             variables={
                 "entity_id": entity_id,
                 "action": "copy_entity_id",
                 "domain": domain,
+                "params": "",
             },
             valid=True,
         )
@@ -979,10 +999,12 @@ def _cmd_actions(args: list[str]) -> None:
             title="Copy Entity Details",
             subtitle="Full entity state as YAML",
             icon=_SYSTEM_ICON,
+            arg=entity_id,
             variables={
                 "entity_id": entity_id,
                 "action": "copy_entity_details",
                 "domain": domain,
+                "params": "",
             },
             valid=True,
         )
@@ -993,10 +1015,12 @@ def _cmd_actions(args: list[str]) -> None:
                 title="Copy Device Details",
                 subtitle="Device registry info as YAML",
                 icon=_SYSTEM_ICON,
+                arg=entity_id,
                 variables={
                     "entity_id": entity_id,
                     "action": "copy_device_details",
                     "domain": domain,
+                    "params": "",
                 },
                 valid=True,
             )
@@ -1008,10 +1032,12 @@ def _cmd_actions(args: list[str]) -> None:
             title="Open Entity",
             subtitle="View in Home Assistant",
             icon=_SYSTEM_ICON,
+            arg=entity_id,
             variables={
                 "entity_id": entity_id,
                 "action": "open_entity",
                 "domain": domain,
+                "params": "",
             },
             valid=True,
         )
@@ -1022,10 +1048,12 @@ def _cmd_actions(args: list[str]) -> None:
                 title="Open Device",
                 subtitle="Device page in Home Assistant",
                 icon=_SYSTEM_ICON,
+                arg=entity_id,
                 variables={
                     "entity_id": entity_id,
                     "action": "open_device",
                     "domain": domain,
+                    "params": "",
                 },
                 valid=True,
             )
@@ -1040,10 +1068,12 @@ def _cmd_actions(args: list[str]) -> None:
                 title="Open Area",
                 subtitle=f"{area_name} in Home Assistant",
                 icon=_SYSTEM_ICON,
+                arg=entity_id,
                 variables={
                     "entity_id": entity_id,
                     "action": "open_area",
                     "domain": domain,
+                    "params": "",
                 },
                 valid=True,
             )
@@ -1053,40 +1083,177 @@ def _cmd_actions(args: list[str]) -> None:
             title="Open History",
             subtitle="Entity history in Home Assistant",
             icon=_SYSTEM_ICON,
+            arg=entity_id,
             variables={
                 "entity_id": entity_id,
                 "action": "open_history",
                 "domain": domain,
+                "params": "",
             },
             valid=True,
         )
     )
 
-    # --- Advanced Action Call (parameterized) ---
-    if dc.available_actions:
-        # Find all params available for this domain's actions
-        all_params: list[str] = []
+    # --- Set Params hint (parameterized actions only) ---
+    # Find the first action with params for this domain — used as the
+    # default when the user types params without specifying an action.
+    first_param_action = ""
+    all_params: list[str] = []
+    for act in dc.available_actions:
+        for p in get_action_params(domain, act):
+            if not first_param_action:
+                first_param_action = act
+            if p.name not in all_params:
+                all_params.append(p.name)
+    if all_params:
+        hint_str = ", ".join(all_params[:4])
+        if len(all_params) > 4:
+            hint_str += ", \u2026"
+        example = f"{all_params[0]}:128"
+        items.append(
+            AlfredItem(
+                title="Set Params\u2026",
+                subtitle=(f"type e.g. {example} \u00b7 available: {hint_str}"),
+                icon=AlfredIcon(path=dc.icon_path),
+                valid=False,
+                autocomplete=f"{all_params[0]}:",
+            )
+        )
+
+    output = AlfredOutput(items=items)
+    sys.stdout.write(output.to_json() + "\n")
+
+
+def _cmd_actions_param_entry(
+    entity_id: str,
+    domain: str,
+    dc: DomainConfig,
+    friendly: str,
+    query: str,
+) -> None:
+    """Handle inline parameter entry within the actions Script Filter.
+
+    Called when the user types ``key:value`` pairs in the actions sub-menu.
+    Resolves the target action, validates params, and shows a confirmation
+    item that routes to ``run-script-action`` with the ``params`` variable.
+    """
+    items: list[AlfredItem] = []
+
+    # Resolve action: check if query starts with an action name
+    action = ""
+    param_str = query
+    first_token = query.split()[0] if query.split() else ""
+    if first_token in dc.available_actions:
+        action = first_token
+        param_str = query[len(first_token) :].strip()
+    else:
+        # Use the first action that has params defined
         for act in dc.available_actions:
-            for p in get_action_params(domain, act):
-                if p.name not in all_params:
-                    all_params.append(p.name)
-        if all_params:
-            hint_str = ", ".join(all_params[:4])
-            if len(all_params) > 4:
-                hint_str += ", \u2026"
+            if get_action_params(domain, act):
+                action = act
+                break
+
+    if not action:
+        items.append(
+            AlfredItem(
+                title="No parameterized actions available",
+                subtitle=f"{domain} has no actions that accept parameters",
+                icon=AlfredIcon(path=dc.icon_path),
+                valid=False,
+            )
+        )
+        output = AlfredOutput(items=items)
+        sys.stdout.write(output.to_json() + "\n")
+        return
+
+    # Show available params if user hasn't typed values yet
+    if not param_str or ":" not in param_str:
+        params = get_action_params(domain, action)
+        action_label = action.replace("_", " ").title()
+        items.append(
+            AlfredItem(
+                title=f"Parameters for {action_label}",
+                subtitle="Type key:value pairs separated by commas",
+                icon=AlfredIcon(path=dc.icon_path),
+                valid=False,
+            )
+        )
+        for p in params:
+            req = " (required)" if p.required else ""
             items.append(
                 AlfredItem(
-                    title="Advanced Action Call\u2026",
-                    subtitle=f"e.g. brightness:50%,transition:2 \u00b7 {hint_str}",
+                    title=f"{p.label}{req}",
+                    subtitle=(
+                        f"{p.name}:<value> \u00b7 {p.hint}"
+                        if p.hint
+                        else f"{p.name}:<value>"
+                    ),
                     icon=AlfredIcon(path=dc.icon_path),
-                    variables={
-                        "entity_id": entity_id,
-                        "action": "action_param",
-                        "domain": domain,
-                    },
                     valid=False,
                 )
             )
+        output = AlfredOutput(items=items)
+        sys.stdout.write(output.to_json() + "\n")
+        return
+
+    # Parse and validate params
+    try:
+        parsed = parse_service_params(param_str, domain, action)
+    except ValueError as exc:
+        items.append(
+            AlfredItem(
+                title="Invalid parameters",
+                subtitle=str(exc),
+                icon=AlfredIcon(path=dc.icon_path),
+                valid=False,
+            )
+        )
+        output = AlfredOutput(items=items)
+        sys.stdout.write(output.to_json() + "\n")
+        return
+
+    if not parsed:
+        items.append(
+            AlfredItem(
+                title="No parameters parsed",
+                subtitle="Type key:value pairs separated by commas",
+                icon=AlfredIcon(path=dc.icon_path),
+                valid=False,
+            )
+        )
+        output = AlfredOutput(items=items)
+        sys.stdout.write(output.to_json() + "\n")
+        return
+
+    # Show confirmation item
+    action_label = action.replace("_", " ").title()
+    summary = ", ".join(f"{k}={v}" for k, v in parsed.items())
+    items.append(
+        AlfredItem(
+            title=f"\u21b5 {action_label} {friendly}",
+            subtitle=summary,
+            icon=AlfredIcon(path=dc.icon_path),
+            arg=entity_id,
+            variables={
+                "entity_id": entity_id,
+                "action": action,
+                "domain": domain,
+                "params": param_str,
+            },
+            valid=True,
+        )
+    )
+
+    # Show parsed params as non-actionable detail items
+    for k, v in parsed.items():
+        items.append(
+            AlfredItem(
+                title=f"{k}: {v}",
+                subtitle=f"Parameter for {action_label}",
+                icon=AlfredIcon(path=dc.icon_path),
+                valid=False,
+            )
+        )
 
     output = AlfredOutput(items=items)
     sys.stdout.write(output.to_json() + "\n")

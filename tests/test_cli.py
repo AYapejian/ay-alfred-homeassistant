@@ -1244,14 +1244,14 @@ class TestActionsCommand:
         assert "Invalid entity ID" in data["items"][0]["title"]
         assert data["items"][0]["valid"] is False
 
-    def test_submenu_includes_advanced_action_call(self, capsys: object) -> None:
+    def test_submenu_includes_param_hint(self, capsys: object) -> None:
         main(["actions", "light.living_room"])
         out = capsys.readouterr().out  # type: ignore[union-attr]
         data = json.loads(out)
-        adv = [i for i in data["items"] if "Advanced Action Call" in i["title"]]
-        assert len(adv) == 1
-        assert adv[0]["valid"] is False
-        assert "brightness" in adv[0]["subtitle"].lower()
+        hint = [i for i in data["items"] if "Set Params" in i["title"]]
+        assert len(hint) == 1
+        assert hint[0]["valid"] is False
+        assert "brightness" in hint[0]["subtitle"].lower()
 
     def test_submenu_parameterized_hint(self, capsys: object) -> None:
         """Turn On action for lights shows param hints in subtitle."""
@@ -1262,13 +1262,13 @@ class TestActionsCommand:
         assert len(turn_on) == 1
         assert "brightness" in turn_on[0]["subtitle"].lower()
 
-    def test_submenu_no_advanced_for_sensor(self, capsys: object) -> None:
-        """Sensors have no actions, so no Advanced Action Call."""
+    def test_submenu_no_param_hint_for_sensor(self, capsys: object) -> None:
+        """Sensors have no actions, so no Set Params hint."""
         main(["actions", "sensor.temperature"])
         out = capsys.readouterr().out  # type: ignore[union-attr]
         data = json.loads(out)
-        adv = [i for i in data["items"] if "Advanced Action Call" in i.get("title", "")]
-        assert len(adv) == 0
+        hint = [i for i in data["items"] if "Set Params" in i.get("title", "")]
+        assert len(hint) == 0
 
     def test_submenu_copy_entity_id(self, capsys: object) -> None:
         main(["actions", "light.living_room"])
@@ -1285,6 +1285,111 @@ class TestActionsCommand:
         items = [i for i in data["items"] if i["title"] == "Open History"]
         assert len(items) == 1
         assert items[0]["variables"]["action"] == "open_history"
+
+    def test_all_valid_items_have_arg(self, capsys: object) -> None:
+        """Every actionable item must carry arg so Alfred fires the connection."""
+        main(["actions", "light.living_room"])
+        out = capsys.readouterr().out  # type: ignore[union-attr]
+        data = json.loads(out)
+        for item in data["items"]:
+            if item.get("valid"):
+                assert "arg" in item, f"valid item missing arg: {item['title']!r}"
+                assert item["arg"] == "light.living_room"
+
+    def test_all_valid_items_have_params_cleared(self, capsys: object) -> None:
+        """Every actionable item must carry params="" to keep $params in Alfred scope.
+
+        Pre-declaring params in each item's variables prevents Alfred from
+        propagating a stale value from a previous parameterised action.
+        """
+        main(["actions", "light.living_room"])
+        out = capsys.readouterr().out  # type: ignore[union-attr]
+        data = json.loads(out)
+        for item in data["items"]:
+            if item.get("valid"):
+                assert "params" in item.get("variables", {}), (
+                    f"valid item missing params variable: {item['title']!r}"
+                )
+                assert item["variables"]["params"] == "", (
+                    f"valid item has non-empty params: {item['title']!r}"
+                )
+
+
+# ---------------------------------------------------------------------------
+# Actions command — inline parameter entry (_cmd_actions_param_entry)
+# ---------------------------------------------------------------------------
+
+
+class TestActionsCommandParamEntry:
+    def test_confirmation_item_valid_with_arg_and_vars(
+        self, capsys: object
+    ) -> None:
+        """Typing key:value shows a valid confirmation item with all variables."""
+        main(["actions", "light.living_room", "brightness:128"])
+        out = capsys.readouterr().out  # type: ignore[union-attr]
+        data = json.loads(out)
+        valid_items = [i for i in data["items"] if i.get("valid")]
+        assert len(valid_items) == 1
+        item = valid_items[0]
+        assert item["arg"] == "light.living_room"
+        assert item["variables"]["entity_id"] == "light.living_room"
+        assert item["variables"]["action"] == "turn_on"
+        assert item["variables"]["domain"] == "light"
+        assert item["variables"]["params"] == "brightness:128"
+
+    def test_confirmation_subtitle_shows_parsed_values(
+        self, capsys: object
+    ) -> None:
+        main(["actions", "light.living_room", "brightness:128"])
+        out = capsys.readouterr().out  # type: ignore[union-attr]
+        data = json.loads(out)
+        item = next(i for i in data["items"] if i.get("valid"))
+        assert "brightness=128" in item["subtitle"]
+
+    def test_detail_items_are_non_actionable(self, capsys: object) -> None:
+        """Sub-items showing parsed param values must not be activatable."""
+        main(["actions", "light.living_room", "brightness:128"])
+        out = capsys.readouterr().out  # type: ignore[union-attr]
+        data = json.loads(out)
+        invalid_items = [i for i in data["items"] if not i.get("valid")]
+        assert any("brightness" in i["title"].lower() for i in invalid_items)
+
+    def test_incomplete_value_shows_error(self, capsys: object) -> None:
+        """Typing 'brightness:' (colon, no value) shows an error, not regular menu."""
+        main(["actions", "light.living_room", "brightness:"])
+        out = capsys.readouterr().out  # type: ignore[union-attr]
+        data = json.loads(out)
+        assert len(data["items"]) == 1
+        assert data["items"][0]["valid"] is False
+
+    def test_invalid_value_shows_error_item(self, capsys: object) -> None:
+        main(["actions", "light.living_room", "brightness:notanumber"])
+        out = capsys.readouterr().out  # type: ignore[union-attr]
+        data = json.loads(out)
+        assert len(data["items"]) == 1
+        assert data["items"][0]["valid"] is False
+        assert "Invalid" in data["items"][0]["title"]
+
+    def test_explicit_action_prefix_in_query(self, capsys: object) -> None:
+        """Explicit action prefix resolves correctly: 'turn_on brightness:50'."""
+        main(["actions", "light.living_room", "turn_on brightness:50"])
+        out = capsys.readouterr().out  # type: ignore[union-attr]
+        data = json.loads(out)
+        valid_items = [i for i in data["items"] if i.get("valid")]
+        assert len(valid_items) == 1
+        item = valid_items[0]
+        assert item["variables"]["action"] == "turn_on"
+        assert item["variables"]["params"] == "brightness:50"
+        assert item["arg"] == "light.living_room"
+
+    def test_percentage_brightness_roundtrip(self, capsys: object) -> None:
+        """'brightness:50%' should parse and appear in the confirmation subtitle."""
+        main(["actions", "light.living_room", "brightness:50%"])
+        out = capsys.readouterr().out  # type: ignore[union-attr]
+        data = json.loads(out)
+        valid_items = [i for i in data["items"] if i.get("valid")]
+        assert len(valid_items) == 1
+        assert "brightness" in valid_items[0]["subtitle"].lower()
 
 
 # ---------------------------------------------------------------------------
