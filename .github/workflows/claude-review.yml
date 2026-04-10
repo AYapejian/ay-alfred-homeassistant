@@ -46,4 +46,4 @@ jobs:
             Post inline comments on specific lines for concrete issues.
             Post a summary with overall assessment.
             Be constructive. Don't duplicate ruff/mypy (CI handles those).
-          claude_args: "--model claude-sonnet-4-6 --max-turns 10"
+          claude_args: "--model claude-sonnet-4-6 --max-turns 20"
