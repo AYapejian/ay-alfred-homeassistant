@@ -22,7 +22,11 @@ from typing import Any, Optional
 # Ensure the workflow root and packages/ are on sys.path.
 _SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 _WORKFLOW_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(_SCRIPT_DIR)))
-for _p in (_WORKFLOW_ROOT, os.path.join(_WORKFLOW_ROOT, "packages")):
+for _p in (
+    _WORKFLOW_ROOT,
+    os.path.join(_WORKFLOW_ROOT, "packages"),
+    os.path.join(_WORKFLOW_ROOT, "src"),
+):
     if _p not in sys.path:
         sys.path.insert(0, _p)
 
