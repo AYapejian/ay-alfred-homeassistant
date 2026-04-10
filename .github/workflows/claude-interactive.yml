@@ -29,4 +29,4 @@ jobs:
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           trigger_phrase: "@claude"
-          claude_args: "--model claude-sonnet-4-6 --max-turns 10"
+          claude_args: "--model claude-sonnet-4-6 --max-turns 20"
