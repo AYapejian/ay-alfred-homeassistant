@@ -8,6 +8,7 @@
 	<string>Productivity</string>
 	<key>connections</key>
 	<dict>
+		<!-- Execute Action → Post Notification -->
 		<key>run-script-action</key>
 		<array>
 			<dict>
@@ -21,6 +22,35 @@
 				<false/>
 			</dict>
 		</array>
+		<!-- Copy Entity ID → Post Notification -->
+		<key>run-script-copy-entity</key>
+		<array>
+			<dict>
+				<key>destinationuid</key>
+				<string>notification-action-result</string>
+				<key>modifiers</key>
+				<integer>0</integer>
+				<key>modifiersubtext</key>
+				<string></string>
+				<key>vitoclose</key>
+				<false/>
+			</dict>
+		</array>
+		<!-- Open in HA → Post Notification -->
+		<key>run-script-open-in-ha</key>
+		<array>
+			<dict>
+				<key>destinationuid</key>
+				<string>notification-action-result</string>
+				<key>modifiers</key>
+				<integer>0</integer>
+				<key>modifiersubtext</key>
+				<string></string>
+				<key>vitoclose</key>
+				<false/>
+			</dict>
+		</array>
+		<!-- Actions Script Filter → Execute Action (plain Enter) -->
 		<key>script-filter-actions</key>
 		<array>
 			<dict>
@@ -33,8 +63,20 @@
 				<key>vitoclose</key>
 				<false/>
 			</dict>
+			<!-- param-capable actions route to params Script Filter -->
+			<dict>
+				<key>destinationuid</key>
+				<string>script-filter-params</string>
+				<key>modifiers</key>
+				<integer>0</integer>
+				<key>modifiersubtext</key>
+				<string>Set parameters</string>
+				<key>vitoclose</key>
+				<false/>
+			</dict>
 		</array>
-		<key>script-filter-search</key>
+		<!-- Params Script Filter → Execute Action -->
+		<key>script-filter-params</key>
 		<array>
 			<dict>
 				<key>destinationuid</key>
@@ -46,6 +88,22 @@
 				<key>vitoclose</key>
 				<false/>
 			</dict>
+		</array>
+		<!-- Search Script Filter connections -->
+		<key>script-filter-search</key>
+		<array>
+			<!-- Plain Enter → Execute Action -->
+			<dict>
+				<key>destinationuid</key>
+				<string>run-script-action</string>
+				<key>modifiers</key>
+				<integer>0</integer>
+				<key>modifiersubtext</key>
+				<string></string>
+				<key>vitoclose</key>
+				<false/>
+			</dict>
+			<!-- ⌘ Enter → Actions submenu -->
 			<dict>
 				<key>destinationuid</key>
 				<string>script-filter-actions</string>
@@ -53,6 +111,28 @@
 				<integer>1048576</integer>
 				<key>modifiersubtext</key>
 				<string>Show available actions</string>
+				<key>vitoclose</key>
+				<false/>
+			</dict>
+			<!-- ⌥ Enter → Copy Entity ID -->
+			<dict>
+				<key>destinationuid</key>
+				<string>run-script-copy-entity</string>
+				<key>modifiers</key>
+				<integer>524288</integer>
+				<key>modifiersubtext</key>
+				<string>Copy entity ID to clipboard</string>
+				<key>vitoclose</key>
+				<false/>
+			</dict>
+			<!-- ⌃ Enter → Open in Home Assistant -->
+			<dict>
+				<key>destinationuid</key>
+				<string>run-script-open-in-ha</string>
+				<key>modifiers</key>
+				<integer>262144</integer>
+				<key>modifiersubtext</key>
+				<string>Open in Home Assistant</string>
 				<key>vitoclose</key>
 				<false/>
 			</dict>
@@ -68,6 +148,7 @@
 	<string>Home Assistant</string>
 	<key>objects</key>
 	<array>
+		<!-- Execute Action node -->
 		<dict>
 			<key>config</key>
 			<dict>
@@ -76,7 +157,7 @@
 				<key>escaping</key>
 				<integer>0</integer>
 				<key>script</key>
-				<string>/usr/bin/python3 ha_workflow/cli.py action "$entity_id" "$action"</string>
+				<string>/usr/bin/python3 ha_workflow/scripts/action_runner.py</string>
 				<key>scriptargtype</key>
 				<integer>1</integer>
 				<key>scriptfile</key>
@@ -84,6 +165,8 @@
 				<key>type</key>
 				<integer>0</integer>
 			</dict>
+			<key>title</key>
+			<string>Execute Action</string>
 			<key>type</key>
 			<string>alfred.workflow.action.script</string>
 			<key>uid</key>
@@ -91,6 +174,59 @@
 			<key>version</key>
 			<integer>2</integer>
 		</dict>
+		<!-- Copy Entity ID node (⌥ Enter) -->
+		<dict>
+			<key>config</key>
+			<dict>
+				<key>concurrently</key>
+				<false/>
+				<key>escaping</key>
+				<integer>0</integer>
+				<key>script</key>
+				<string>/usr/bin/python3 ha_workflow/scripts/copy_entity.py</string>
+				<key>scriptargtype</key>
+				<integer>1</integer>
+				<key>scriptfile</key>
+				<string></string>
+				<key>type</key>
+				<integer>0</integer>
+			</dict>
+			<key>title</key>
+			<string>Copy Entity ID</string>
+			<key>type</key>
+			<string>alfred.workflow.action.script</string>
+			<key>uid</key>
+			<string>run-script-copy-entity</string>
+			<key>version</key>
+			<integer>2</integer>
+		</dict>
+		<!-- Open in Home Assistant node (⌃ Enter) -->
+		<dict>
+			<key>config</key>
+			<dict>
+				<key>concurrently</key>
+				<false/>
+				<key>escaping</key>
+				<integer>0</integer>
+				<key>script</key>
+				<string>/usr/bin/python3 ha_workflow/scripts/open_in_ha.py</string>
+				<key>scriptargtype</key>
+				<integer>1</integer>
+				<key>scriptfile</key>
+				<string></string>
+				<key>type</key>
+				<integer>0</integer>
+			</dict>
+			<key>title</key>
+			<string>Open in Home Assistant</string>
+			<key>type</key>
+			<string>alfred.workflow.action.script</string>
+			<key>uid</key>
+			<string>run-script-open-in-ha</string>
+			<key>version</key>
+			<integer>2</integer>
+		</dict>
+		<!-- Search Script Filter node -->
 		<dict>
 			<key>config</key>
 			<dict>
@@ -109,9 +245,9 @@
 				<key>keyword</key>
 				<string>ha</string>
 				<key>queuedelaycustom</key>
-				<integer>1</integer>
+				<integer>3</integer>
 				<key>queuedelayimmediatelyinitially</key>
-				<false/>
+				<true/>
 				<key>queuedelaymode</key>
 				<integer>0</integer>
 				<key>queuemode</key>
@@ -119,7 +255,7 @@
 				<key>runningsubtext</key>
 				<string>Searching Home Assistant...</string>
 				<key>script</key>
-				<string>/usr/bin/python3 ha_workflow/cli.py search "{query}"</string>
+				<string>/usr/bin/python3 ha_workflow/scripts/search_filter.py "{query}"</string>
 				<key>scriptargtype</key>
 				<integer>0</integer>
 				<key>scriptfile</key>
@@ -140,6 +276,7 @@
 			<key>version</key>
 			<integer>3</integer>
 		</dict>
+		<!-- Post Notification node -->
 		<dict>
 			<key>config</key>
 			<dict>
@@ -161,6 +298,7 @@
 			<key>version</key>
 			<integer>1</integer>
 		</dict>
+		<!-- Actions Script Filter node (⌘ from search) -->
 		<dict>
 			<key>config</key>
 			<dict>
@@ -189,7 +327,7 @@
 				<key>runningsubtext</key>
 				<string>Loading actions...</string>
 				<key>script</key>
-				<string>/usr/bin/python3 ha_workflow/cli.py actions "$entity_id" "{query}"</string>
+				<string>/usr/bin/python3 ha_workflow/scripts/actions_filter.py "{query}"</string>
 				<key>scriptargtype</key>
 				<integer>0</integer>
 				<key>scriptfile</key>
@@ -210,6 +348,56 @@
 			<key>version</key>
 			<integer>3</integer>
 		</dict>
+		<!-- Set Parameters Script Filter node -->
+		<dict>
+			<key>config</key>
+			<dict>
+				<key>alfredfiltersresults</key>
+				<false/>
+				<key>alfredfiltersresultsmatchmode</key>
+				<integer>0</integer>
+				<key>argumenttreatemptyqueryasnil</key>
+				<false/>
+				<key>argumenttrimmode</key>
+				<integer>0</integer>
+				<key>argumenttype</key>
+				<integer>1</integer>
+				<key>escaping</key>
+				<integer>0</integer>
+				<key>keyword</key>
+				<string></string>
+				<key>queuedelaycustom</key>
+				<integer>1</integer>
+				<key>queuedelayimmediatelyinitially</key>
+				<false/>
+				<key>queuedelaymode</key>
+				<integer>0</integer>
+				<key>queuemode</key>
+				<integer>1</integer>
+				<key>runningsubtext</key>
+				<string>Loading parameters...</string>
+				<key>script</key>
+				<string>/usr/bin/python3 ha_workflow/scripts/params_filter.py "{query}"</string>
+				<key>scriptargtype</key>
+				<integer>0</integer>
+				<key>scriptfile</key>
+				<string></string>
+				<key>subtext</key>
+				<string>Type key:value pairs (e.g. brightness:50%,transition:2)</string>
+				<key>title</key>
+				<string>Set Parameters</string>
+				<key>type</key>
+				<integer>0</integer>
+				<key>withspace</key>
+				<true/>
+			</dict>
+			<key>type</key>
+			<string>alfred.workflow.input.scriptfilter</string>
+			<key>uid</key>
+			<string>script-filter-params</string>
+			<key>version</key>
+			<integer>3</integer>
+		</dict>
 	</array>
 	<key>readme</key>
 	<string>Alfred workflow for Home Assistant. Search entities, execute actions, and manage your smart home from Alfred.
@@ -217,22 +405,42 @@
 Configuration:
 - HA_URL: Your Home Assistant URL (e.g., http://homeassistant.local:8123)
 - HA_TOKEN: A long-lived access token from HA
-- CACHE_TTL: Cache refresh interval in seconds (default: 60)</string>
+- CACHE_TTL: Cache refresh interval in seconds (default: 60)
+
+Keyboard shortcuts from search results:
+- Enter: Execute default action for entity
+- ⌘ Enter: Show action submenu
+- ⌥ Enter: Copy entity ID to clipboard
+- ⌃ Enter: Open entity in Home Assistant browser</string>
 	<key>uidata</key>
 	<dict>
 		<key>notification-action-result</key>
 		<dict>
 			<key>xpos</key>
-			<real>700.0</real>
+			<real>1000.0</real>
 			<key>ypos</key>
 			<real>200.0</real>
 		</dict>
 		<key>run-script-action</key>
 		<dict>
 			<key>xpos</key>
-			<real>400.0</real>
+			<real>700.0</real>
 			<key>ypos</key>
 			<real>200.0</real>
+		</dict>
+		<key>run-script-copy-entity</key>
+		<dict>
+			<key>xpos</key>
+			<real>700.0</real>
+			<key>ypos</key>
+			<real>400.0</real>
+		</dict>
+		<key>run-script-open-in-ha</key>
+		<dict>
+			<key>xpos</key>
+			<real>700.0</real>
+			<key>ypos</key>
+			<real>550.0</real>
 		</dict>
 		<key>script-filter-actions</key>
 		<dict>
@@ -240,6 +448,13 @@ Configuration:
 			<real>400.0</real>
 			<key>ypos</key>
 			<real>400.0</real>
+		</dict>
+		<key>script-filter-params</key>
+		<dict>
+			<key>xpos</key>
+			<real>700.0</real>
+			<key>ypos</key>
+			<real>700.0</real>
 		</dict>
 		<key>script-filter-search</key>
 		<dict>
@@ -317,6 +532,14 @@ Configuration:
 	</array>
 	<key>variables</key>
 	<dict>
+		<key>action</key>
+		<string></string>
+		<key>domain</key>
+		<string></string>
+		<key>entity_id</key>
+		<string></string>
+		<key>param_mode</key>
+		<string></string>
 		<key>params</key>
 		<string></string>
 	</dict>
