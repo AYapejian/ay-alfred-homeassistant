@@ -108,6 +108,17 @@ class EntityCache:
         )
         return [self._row_to_entity(row) for row in cur.fetchall()]
 
+    def get_by_entity_id(self, entity_id: str) -> Optional[Entity]:
+        """Return the cached entity with *entity_id*, or ``None`` if missing."""
+        cur = self._conn.execute(
+            "SELECT entity_id, domain, state, friendly_name, "
+            "attributes_json, last_changed, last_updated, area_name, device_id "
+            "FROM entities WHERE entity_id = ?",
+            (entity_id,),
+        )
+        row = cur.fetchone()
+        return self._row_to_entity(row) if row else None
+
     def get_by_domain(self, domain: str) -> list[Entity]:
         """Return all cached entities in the given *domain*."""
         cur = self._conn.execute(
