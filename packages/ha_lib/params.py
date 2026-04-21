@@ -5,10 +5,49 @@ from __future__ import annotations
 import math
 from typing import Optional, Union
 
+from ha_lib.colors import resolve_color
 from ha_lib.entities import get_action_params
+
+# Short aliases users can type; the canonical HA service_data key on the right.
+_KEY_ALIASES: dict[str, str] = {
+    "color": "color_name",
+}
 
 # Type produced by the parser — values are coerced to their declared types.
 ParamValue = Union[int, float, str, bool]
+
+
+def extract_param_keys(raw: str) -> list[str]:
+    """Return the canonical key names the user supplied in *raw*.
+
+    Aliases are resolved (``color`` → ``color_name``) and the ``rgb_color``
+    triplet is detected specially.  Used by the quick-exec flow to pick the
+    right action before full parsing; safe to call on partially-typed input.
+    """
+    if not raw or not raw.strip():
+        return []
+    keys: list[str] = []
+    remaining = raw
+    if "rgb_color:" in remaining:
+        keys.append("rgb_color")
+        # Scrub the rgb_color portion so we don't mis-read its numeric triplet
+        # as further key:value pairs.
+        before, rgb_rest = remaining.split("rgb_color:", 1)
+        try:
+            _, after = _extract_rgb(rgb_rest)
+        except ValueError:
+            after = ""
+        parts = [p.strip() for p in [before.rstrip(",").strip(), after] if p.strip()]
+        remaining = ",".join(parts)
+    for pair in remaining.split(","):
+        pair = pair.strip()
+        if ":" not in pair:
+            continue
+        key, _ = pair.split(":", 1)
+        key = _KEY_ALIASES.get(key.strip(), key.strip())
+        if key:
+            keys.append(key)
+    return keys
 
 
 def parse_service_params(
@@ -27,6 +66,9 @@ def parse_service_params(
     * **brightness** — a trailing ``%`` converts the percentage (0-100) to the
       HA 0-255 range.
     * **rgb_color** — ``"255,0,0"`` is converted to ``[255, 0, 0]``.
+    * **color / color_name** — a known named color (``red``, ``eggshell``,
+      ``warm_white``, etc.) is resolved to ``rgb_color`` so HA gets coordinates
+      it always understands.  Unknown names pass through as ``color_name``.
 
     Raises :class:`ValueError` on parse or validation failures.
     """
@@ -60,6 +102,17 @@ def parse_service_params(
         value = value.strip()
         if not key:
             raise ValueError(f"Empty parameter name in: {pair!r}")
+
+        key = _KEY_ALIASES.get(key, key)
+
+        # Color-name resolution: turn known names into rgb_color so HA
+        # receives a palette-independent coordinate.
+        if key == "color_name":
+            rgb = resolve_color(value)
+            if rgb is not None:
+                result["rgb_color"] = [rgb[0], rgb[1], rgb[2]]
+                continue
+            # Unknown name — fall through and let HA try color_name.
 
         param_def = param_defs.get(key)
         if param_def is None:

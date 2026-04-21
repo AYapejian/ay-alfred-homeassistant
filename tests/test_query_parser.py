@@ -126,3 +126,49 @@ class TestEdgeCases:
         # Space before colon — not a domain filter
         assert result.mode == "fuzzy"
         assert result.text == "light :bedroom"
+
+
+class TestQuickExec:
+    def test_entity_only(self) -> None:
+        result = parse_query("light.bedroom_lamp")
+        assert result.mode == "quick_exec"
+        assert result.entity_id == "light.bedroom_lamp"
+        assert result.raw_params == ""
+
+    def test_entity_with_params(self) -> None:
+        result = parse_query(
+            "light.aras_room_light_group_all brightness:80,color:eggshell,transition:10"
+        )
+        assert result.mode == "quick_exec"
+        assert result.entity_id == "light.aras_room_light_group_all"
+        assert result.raw_params == "brightness:80,color:eggshell,transition:10"
+
+    def test_entity_with_spaced_params(self) -> None:
+        # Everything after the first space is the param blob; internal spaces
+        # survive so ``brightness:80, color:red`` still parses downstream.
+        result = parse_query("switch.kitchen  brightness:50 ,color:red")
+        assert result.mode == "quick_exec"
+        assert result.entity_id == "switch.kitchen"
+        assert result.raw_params == "brightness:50 ,color:red"
+
+    def test_underscored_domain(self) -> None:
+        result = parse_query("input_boolean.night_mode")
+        assert result.mode == "quick_exec"
+        assert result.entity_id == "input_boolean.night_mode"
+
+    def test_unknown_domain_falls_through(self) -> None:
+        # ``foo`` is not in the domain registry; should behave as fuzzy search.
+        result = parse_query("foo.bar")
+        assert result.mode == "fuzzy"
+        assert result.text == "foo.bar"
+
+    def test_bad_shape_falls_through(self) -> None:
+        # Missing object_id after the dot.
+        result = parse_query("light.")
+        assert result.mode == "fuzzy"
+        assert result.text == "light."
+
+    def test_dotted_text_not_entity(self) -> None:
+        # Multiple dots aren't a valid entity_id shape.
+        result = parse_query("light.foo.bar")
+        assert result.mode == "fuzzy"

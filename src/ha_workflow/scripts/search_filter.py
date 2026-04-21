@@ -31,6 +31,8 @@ import ha_lib.suggestions as _lib_suggestions  # noqa: E402
 from ha_lib.config import Config  # noqa: E402
 from ha_lib.entities import Entity, get_domain_config  # noqa: E402
 from ha_lib.errors import handle_error  # noqa: E402
+from ha_lib.inference import infer_action  # noqa: E402
+from ha_lib.params import extract_param_keys, parse_service_params  # noqa: E402
 from ha_lib.query_parser import ParsedQuery, parse_query  # noqa: E402
 from ha_lib.usage import UsageRecord, open_usage_tracker  # noqa: E402
 from ha_workflow.alfred import (  # noqa: E402
@@ -283,6 +285,8 @@ def main() -> None:
 
             if parsed.mode == "regex":
                 output = _search_regex(cache, parsed)
+            elif parsed.mode == "quick_exec":
+                output = _quick_exec(cache, parsed, usage_stats, query)
             elif parsed.domain_filter:
                 output = _search_domain_filtered(cache, parsed, usage_stats, query)
             else:
@@ -332,6 +336,104 @@ def _search_domain_filtered(
         domain_entities, parsed.text, usage_stats=usage_stats
     )
     return _build_search_output(results, query)
+
+
+def _format_param_summary(parsed: dict[str, object]) -> str:
+    """Short human-readable summary of parsed service params."""
+    parts: list[str] = []
+    for k, v in parsed.items():
+        if k == "brightness" and isinstance(v, int):
+            pct = round(v / 255 * 100)
+            parts.append(f"brightness={v}/255 (\u2248{pct}%)")
+        elif k == "rgb_color" and isinstance(v, list) and len(v) == 3:
+            parts.append(f"rgb={v[0]},{v[1]},{v[2]}")
+        else:
+            parts.append(f"{k}={v}")
+    return ", ".join(parts)
+
+
+def _quick_exec(
+    cache: _lib_cache.EntityCache,
+    parsed: ParsedQuery,
+    usage_stats: dict[str, UsageRecord],
+    query: str,
+) -> AlfredOutput:
+    """Build an Alfred output for the quick-exec syntax.
+
+    If the entity is unknown, fall back to fuzzy search so typos behave like
+    normal queries.  If params fail to parse, show an error row **followed**
+    by fuzzy matches so the user can still find what they meant.
+    """
+    entity_id = parsed.entity_id or ""
+    raw_params = parsed.raw_params or ""
+
+    entity = cache.get_by_entity_id(entity_id)
+    if entity is None:
+        # Unknown entity — run normal fuzzy search over the whole query.
+        fallback = ParsedQuery(
+            mode="fuzzy",
+            text=query.strip(),
+            domain_filter=None,
+            regex_pattern=None,
+        )
+        return _search_fuzzy(cache, fallback, usage_stats, query)
+
+    dc = get_domain_config(entity.domain)
+
+    # Two-pass: extract the keys the user typed so infer_action can pick the
+    # right service, then re-parse with that action for type coercion +
+    # validation (e.g. brightness:80% → 204 when action is light.turn_on).
+    action = infer_action(entity.domain, extract_param_keys(raw_params))
+    try:
+        service_data = (
+            parse_service_params(raw_params, entity.domain, action)
+            if raw_params
+            else {}
+        )
+    except ValueError as exc:
+        items: list[AlfredItem] = [
+            AlfredItem(
+                title=f"Invalid parameters for {entity.friendly_name}",
+                subtitle=str(exc),
+                icon=AlfredIcon(path=dc.icon_path),
+                valid=False,
+            )
+        ]
+        return AlfredOutput(items=items)
+
+    if not action:
+        return AlfredOutput(
+            items=[
+                AlfredItem(
+                    title=f"No action available for {entity.friendly_name}",
+                    subtitle=f"Domain '{entity.domain}' has no default action",
+                    icon=AlfredIcon(path=dc.icon_path),
+                    valid=False,
+                )
+            ]
+        )
+
+    action_label = action.replace("_", " ").title()
+    if service_data:
+        summary = _format_param_summary(service_data)
+        subtitle = f"{action_label} \u2192 {summary}"
+    else:
+        subtitle = f"{action_label} \u00b7 {entity.entity_id}"
+
+    item = AlfredItem(
+        title=f"\u21b5 {action_label} {entity.friendly_name}",
+        subtitle=subtitle,
+        arg=entity.entity_id,
+        icon=AlfredIcon(path=dc.icon_path),
+        variables={
+            "entity_id": entity.entity_id,
+            "action": action,
+            "domain": entity.domain,
+            "params": raw_params,
+        },
+        valid=True,
+    )
+    return AlfredOutput(items=[item])
 
 
 def _search_fuzzy(

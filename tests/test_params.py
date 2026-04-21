@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from ha_workflow.params import parse_service_params
+from ha_workflow.params import extract_param_keys, parse_service_params
 
 
 class TestBasicParsing:
@@ -149,3 +149,63 @@ class TestInputHelpers:
     def test_input_text(self) -> None:
         result = parse_service_params("value:hello world", "input_text", "set_value")
         assert result == {"value": "hello world"}
+
+
+class TestColorResolution:
+    def test_color_alias_resolves_named_to_rgb(self) -> None:
+        # ``color`` is an alias for ``color_name`` and known palette entries
+        # become rgb_color so HA gets a coordinate rather than a palette name.
+        result = parse_service_params("color:red", "light", "turn_on")
+        assert result == {"rgb_color": [255, 0, 0]}
+
+    def test_color_name_resolves_to_rgb(self) -> None:
+        result = parse_service_params("color_name:eggshell", "light", "turn_on")
+        assert result == {"rgb_color": [255, 255, 212]}
+
+    def test_unknown_color_passes_through_as_name(self) -> None:
+        # Let HA handle truly unknown names — we don't swallow them.
+        result = parse_service_params("color:not_a_real_color_xyz", "light", "turn_on")
+        assert result == {"color_name": "not_a_real_color_xyz"}
+
+    def test_color_combined_with_brightness(self) -> None:
+        result = parse_service_params(
+            "brightness:80%,color:eggshell,transition:10",
+            "light",
+            "turn_on",
+        )
+        # 80% → ceil(0.8 * 255) = 204
+        assert result == {
+            "brightness": 204,
+            "rgb_color": [255, 255, 212],
+            "transition": 10.0,
+        }
+
+
+class TestExtractParamKeys:
+    def test_empty(self) -> None:
+        assert extract_param_keys("") == []
+        assert extract_param_keys("   ") == []
+
+    def test_single_key(self) -> None:
+        assert extract_param_keys("brightness:50") == ["brightness"]
+
+    def test_color_alias_resolved_to_color_name(self) -> None:
+        assert extract_param_keys("color:red") == ["color_name"]
+
+    def test_rgb_color_detected(self) -> None:
+        # rgb_color is detected specially so its comma-separated triplet
+        # isn't mis-parsed as three key:value pairs.
+        keys = extract_param_keys("rgb_color:255,0,0,transition:2")
+        assert "rgb_color" in keys
+        assert "transition" in keys
+
+    def test_multiple_keys(self) -> None:
+        keys = extract_param_keys("brightness:80%,color:eggshell,transition:10")
+        assert keys == ["brightness", "color_name", "transition"]
+
+    def test_skips_malformed(self) -> None:
+        # Pair without a colon is simply skipped — never raises.
+        assert extract_param_keys("brightness:50,oops,color:red") == [
+            "brightness",
+            "color_name",
+        ]
