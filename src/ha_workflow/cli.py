@@ -104,21 +104,24 @@ _SYSTEM_ICON = AlfredIcon(path="icons/_system.png")
 def _match_system_commands(query: str) -> list[AlfredItem]:
     """Return system command items matching *query*.
 
-    Returns **all** system commands when *query* is empty (for the
-    default view).  When *query* is non-empty, filters by keyword match.
+    System commands are hidden behind the ``system`` subcommand: the first
+    token of *query* must equal ``system`` (case-insensitive) for any items
+    to be returned.  Remaining tokens filter the commands by keyword prefix.
 
     Uses a macOS system icon and "System" subtitle prefix to visually
     distinguish these from entity search results.
     """
-    query_lower = query.strip().lower()
+    tokens = query.strip().lower().split()
+    if not tokens or tokens[0] != "system":
+        return []
+    filter_words = tokens[1:]
     items: list[AlfredItem] = []
     for cmd in _SYSTEM_COMMANDS:
-        if query_lower:
-            query_words = query_lower.split()
+        if filter_words:
             keyword_words = cmd["keywords"].split()
-            # Each query word must be a prefix of at least one keyword
+            # Each filter word must be a prefix of at least one keyword
             if not all(
-                any(kw.startswith(qw) for kw in keyword_words) for qw in query_words
+                any(kw.startswith(qw) for kw in keyword_words) for qw in filter_words
             ):
                 continue
         items.append(
@@ -375,24 +378,26 @@ def _cmd_search(query: str) -> None:
                 rerun=1.0,
             )
         else:
-            usage_stats = tracker.get_usage_stats()
-            parsed = parse_query(query)
-            _dbg(f"search: parsed mode={parsed.mode} domain={parsed.domain_filter}")
-
-            if parsed.mode == "regex":
-                output = _search_regex(cache, parsed)
-            elif parsed.domain_filter:
-                output = _search_domain_filtered(cache, parsed, usage_stats)
-            else:
-                output = _search_fuzzy(cache, parsed, usage_stats)
-
-            # System commands always at the top, across all search modes
+            # `system` subcommand: show only system commands, no entity search.
             sys_items = _match_system_commands(query)
             if sys_items:
-                output.items = sys_items + output.items
+                output = AlfredOutput(items=sys_items)
+                if needs_refresh:
+                    output.rerun = 1.0
+            else:
+                usage_stats = tracker.get_usage_stats()
+                parsed = parse_query(query)
+                _dbg(f"search: parsed mode={parsed.mode} domain={parsed.domain_filter}")
 
-            if needs_refresh:
-                output.rerun = 1.0
+                if parsed.mode == "regex":
+                    output = _search_regex(cache, parsed)
+                elif parsed.domain_filter:
+                    output = _search_domain_filtered(cache, parsed, usage_stats)
+                else:
+                    output = _search_fuzzy(cache, parsed, usage_stats)
+
+                if needs_refresh:
+                    output.rerun = 1.0
     finally:
         cache.close()
         tracker.close()

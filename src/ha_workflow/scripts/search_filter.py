@@ -103,14 +103,19 @@ def _dbg(msg: str) -> None:
 
 
 def _match_system_commands(query: str) -> list[AlfredItem]:
-    query_lower = query.strip().lower()
+    # Hidden behind the `system` subcommand: the first token of *query* must
+    # equal "system" before any items are returned.  Remaining tokens filter
+    # the list by keyword prefix.
+    tokens = query.strip().lower().split()
+    if not tokens or tokens[0] != "system":
+        return []
+    filter_words = tokens[1:]
     items: list[AlfredItem] = []
     for cmd in _SYSTEM_COMMANDS:
-        if query_lower:
-            query_words = query_lower.split()
+        if filter_words:
             keyword_words = cmd["keywords"].split()
             if not all(
-                any(kw.startswith(qw) for kw in keyword_words) for qw in query_words
+                any(kw.startswith(qw) for kw in keyword_words) for qw in filter_words
             ):
                 continue
         items.append(
@@ -279,25 +284,28 @@ def main() -> None:
                 rerun=1.0,
             )
         else:
-            usage_stats = tracker.get_usage_stats()
-            parsed = parse_query(query)
-            _dbg(f"search: parsed mode={parsed.mode} domain={parsed.domain_filter}")
-
-            if parsed.mode == "regex":
-                output = _search_regex(cache, parsed)
-            elif parsed.mode == "quick_exec":
-                output = _quick_exec(cache, parsed, usage_stats, query)
-            elif parsed.domain_filter:
-                output = _search_domain_filtered(cache, parsed, usage_stats, query)
-            else:
-                output = _search_fuzzy(cache, parsed, usage_stats, query)
-
+            # `system` subcommand: show only system commands, no entity search.
             sys_items = _match_system_commands(query)
             if sys_items:
-                output.items = sys_items + output.items
+                output = AlfredOutput(items=sys_items)
+                if needs_refresh:
+                    output.rerun = 1.0
+            else:
+                usage_stats = tracker.get_usage_stats()
+                parsed = parse_query(query)
+                _dbg(f"search: parsed mode={parsed.mode} domain={parsed.domain_filter}")
 
-            if needs_refresh:
-                output.rerun = 1.0
+                if parsed.mode == "regex":
+                    output = _search_regex(cache, parsed)
+                elif parsed.mode == "quick_exec":
+                    output = _quick_exec(cache, parsed, usage_stats, query)
+                elif parsed.domain_filter:
+                    output = _search_domain_filtered(cache, parsed, usage_stats, query)
+                else:
+                    output = _search_fuzzy(cache, parsed, usage_stats, query)
+
+                if needs_refresh:
+                    output.rerun = 1.0
     finally:
         cache.close()
         tracker.close()

@@ -239,15 +239,15 @@ class TestSearchCommand:
 
         out = capsys.readouterr().out  # type: ignore[union-attr]
         data = json.loads(out)
-        # System commands prepended + 3 entities
-        entity_items = [
+        # System commands are hidden behind the `system` subcommand, so an
+        # empty query returns only entity items.
+        sys_items = [
             i
             for i in data["items"]
-            if i.get("variables", {}).get("domain") != "__system__"
+            if i.get("variables", {}).get("domain") == "__system__"
         ]
-        assert len(entity_items) == 3
-        # System commands appear first
-        assert data["items"][0]["variables"]["domain"] == "__system__"
+        assert sys_items == []
+        assert len(data["items"]) == 3
 
     @patch("ha_workflow.cli.open_usage_tracker")
     @patch("ha_workflow.cli._maybe_refresh_background")
@@ -766,7 +766,7 @@ class TestSystemCommandsInSearch:
         mock_open_cache.return_value = _mock_cache()
         mock_open_tracker.return_value = _mock_tracker()
 
-        main(["search", "history clear"])
+        main(["search", "system history clear"])
 
         out = capsys.readouterr().out  # type: ignore[union-attr]
         data = json.loads(out)
@@ -797,7 +797,7 @@ class TestSystemCommandsInSearch:
         mock_open_cache.return_value = _mock_cache()
         mock_open_tracker.return_value = _mock_tracker()
 
-        main(["search", "cache refresh"])
+        main(["search", "system cache refresh"])
 
         out = capsys.readouterr().out  # type: ignore[union-attr]
         data = json.loads(out)
@@ -1111,7 +1111,7 @@ class TestSystemCommandsSearch:
         mock_open_cache.return_value = _mock_cache()
         mock_open_tracker.return_value = _mock_tracker()
 
-        main(["search", "restart"])
+        main(["search", "system restart"])
 
         out = capsys.readouterr().out  # type: ignore[union-attr]
         data = json.loads(out)
@@ -1134,7 +1134,7 @@ class TestSystemCommandsSearch:
         mock_open_cache.return_value = _mock_cache()
         mock_open_tracker.return_value = _mock_tracker()
 
-        main(["search", "check config"])
+        main(["search", "system check config"])
 
         out = capsys.readouterr().out  # type: ignore[union-attr]
         data = json.loads(out)
@@ -1157,7 +1157,7 @@ class TestSystemCommandsSearch:
         mock_open_cache.return_value = _mock_cache()
         mock_open_tracker.return_value = _mock_tracker()
 
-        main(["search", "error log"])
+        main(["search", "system error log"])
 
         out = capsys.readouterr().out  # type: ignore[union-attr]
         data = json.loads(out)
@@ -1168,7 +1168,36 @@ class TestSystemCommandsSearch:
     @patch("ha_workflow.cli._maybe_refresh_background")
     @patch("ha_workflow.cli.open_cache")
     @patch("ha_workflow.cli.Config.from_env")
-    def test_all_system_commands_on_empty_query(
+    def test_all_system_commands_on_system_subcommand(
+        self,
+        mock_from_env: MagicMock,
+        mock_open_cache: MagicMock,
+        mock_bg_refresh: MagicMock,
+        mock_open_tracker: MagicMock,
+        capsys: object,
+    ) -> None:
+        mock_from_env.return_value = MagicMock(cache_ttl=60)
+        mock_open_cache.return_value = _mock_cache()
+        mock_open_tracker.return_value = _mock_tracker()
+
+        main(["search", "system"])
+
+        out = capsys.readouterr().out  # type: ignore[union-attr]
+        data = json.loads(out)
+        sys_items = [
+            i
+            for i in data["items"]
+            if i.get("variables", {}).get("domain") == "__system__"
+        ]
+        # All 5 system commands and no entity items under `system`
+        assert len(sys_items) == 5
+        assert len(data["items"]) == 5
+
+    @patch("ha_workflow.cli.open_usage_tracker")
+    @patch("ha_workflow.cli._maybe_refresh_background")
+    @patch("ha_workflow.cli.open_cache")
+    @patch("ha_workflow.cli.Config.from_env")
+    def test_no_system_commands_on_empty_query(
         self,
         mock_from_env: MagicMock,
         mock_open_cache: MagicMock,
@@ -1189,8 +1218,36 @@ class TestSystemCommandsSearch:
             for i in data["items"]
             if i.get("variables", {}).get("domain") == "__system__"
         ]
-        # Should have all 5 system commands
-        assert len(sys_items) == 5
+        assert sys_items == []
+
+    @patch("ha_workflow.cli.open_usage_tracker")
+    @patch("ha_workflow.cli._maybe_refresh_background")
+    @patch("ha_workflow.cli.open_cache")
+    @patch("ha_workflow.cli.Config.from_env")
+    def test_bare_keyword_does_not_surface_system_command(
+        self,
+        mock_from_env: MagicMock,
+        mock_open_cache: MagicMock,
+        mock_bg_refresh: MagicMock,
+        mock_open_tracker: MagicMock,
+        capsys: object,
+    ) -> None:
+        # Previously "cache" or "restart" would surface a system command;
+        # now they must not, since those are hidden behind `system`.
+        mock_from_env.return_value = MagicMock(cache_ttl=60)
+        mock_open_cache.return_value = _mock_cache()
+        mock_open_tracker.return_value = _mock_tracker()
+
+        main(["search", "cache"])
+
+        out = capsys.readouterr().out  # type: ignore[union-attr]
+        data = json.loads(out)
+        sys_items = [
+            i
+            for i in data["items"]
+            if i.get("variables", {}).get("domain") == "__system__"
+        ]
+        assert sys_items == []
 
 
 class TestActionsCommand:
