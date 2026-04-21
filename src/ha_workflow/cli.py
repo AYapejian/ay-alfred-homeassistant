@@ -159,13 +159,31 @@ class _RegistryInfo(NamedTuple):
 
     area_name: str
     device_id: str
+    labels: tuple[str, ...]
+
+
+def _normalize_labels(raw: Any) -> tuple[str, ...]:
+    """Coerce an HA registry ``labels`` value into a tuple of lowercase slugs."""
+    if not raw:
+        return ()
+    if isinstance(raw, str):
+        raw = [raw]
+    out: list[str] = []
+    for item in raw:
+        if not item:
+            continue
+        s = str(item).strip().lower()
+        if s:
+            out.append(s)
+    return tuple(out)
 
 
 def _build_registry_lookup(client: HAClient) -> dict[str, _RegistryInfo]:
     """Fetch entity, device, and area registries.
 
     Returns ``{entity_id: _RegistryInfo}`` with area resolved through the
-    device when the entity itself has no direct ``area_id``.
+    device when the entity itself has no direct ``area_id``, and labels
+    unioned with the device's labels so device-level tags propagate.
     """
     try:
         # area_id → area name
@@ -176,15 +194,21 @@ def _build_registry_lookup(client: HAClient) -> dict[str, _RegistryInfo]:
             if aid and name:
                 area_names[aid] = name
 
-        # device id → area_id
+        # device id → (area_id, labels)
         device_areas: dict[str, str] = {}
+        device_labels: dict[str, tuple[str, ...]] = {}
         for dev in client.get_device_registry():
             did = dev.get("id", "")
+            if not did:
+                continue
             aid = dev.get("area_id", "")
-            if did and aid:
+            if aid:
                 device_areas[did] = aid
+            dev_labels = _normalize_labels(dev.get("labels"))
+            if dev_labels:
+                device_labels[did] = dev_labels
 
-        # entity_id → (area_name, device_id)
+        # entity_id → _RegistryInfo
         lookup: dict[str, _RegistryInfo] = {}
         for entry in client.get_entity_registry():
             eid = entry.get("entity_id", "")
@@ -199,7 +223,21 @@ def _build_registry_lookup(client: HAClient) -> dict[str, _RegistryInfo]:
                 area_id = device_areas.get(device_id, "")
 
             area_name = area_names.get(area_id, "")
-            lookup[eid] = _RegistryInfo(area_name=area_name, device_id=device_id)
+
+            # Union entity labels with device labels (device tags propagate
+            # to all child entities; duplicates are removed, order preserved).
+            entity_labels = _normalize_labels(entry.get("labels"))
+            dev_labels = device_labels.get(device_id, ())
+            merged: list[str] = list(entity_labels)
+            for label in dev_labels:
+                if label not in merged:
+                    merged.append(label)
+
+            lookup[eid] = _RegistryInfo(
+                area_name=area_name,
+                device_id=device_id,
+                labels=tuple(merged),
+            )
 
         return lookup
     except Exception:
@@ -226,6 +264,7 @@ def _refresh_cache(config: Config, cache: EntityCache) -> None:
                 s,
                 area_name=info.area_name if info else "",
                 device_id=info.device_id if info else "",
+                labels=info.labels if info else (),
             )
         )
     cache.refresh(entities)
@@ -392,9 +431,13 @@ def _cmd_search(query: str) -> None:
                 if parsed.mode == "regex":
                     output = _search_regex(cache, parsed)
                 elif parsed.domain_filter:
-                    output = _search_domain_filtered(cache, parsed, usage_stats)
+                    output = _search_domain_filtered(
+                        cache, parsed, usage_stats, config.preferred_label
+                    )
                 else:
-                    output = _search_fuzzy(cache, parsed, usage_stats)
+                    output = _search_fuzzy(
+                        cache, parsed, usage_stats, config.preferred_label
+                    )
 
                 if needs_refresh:
                     output.rerun = 1.0
@@ -428,11 +471,17 @@ def _search_domain_filtered(
     cache: EntityCache,
     parsed: ParsedQuery,
     usage_stats: dict[str, UsageRecord],
+    preferred_label: str,
 ) -> AlfredOutput:
     """Handle domain-filtered search (e.g. ``light:bedroom``)."""
     domain_entities = cache.get_by_domain(parsed.domain_filter or "")
     _dbg(f"search: {len(domain_entities)} entities in domain {parsed.domain_filter}")
-    results = fuzzy_search(domain_entities, parsed.text, usage_stats=usage_stats)
+    results = fuzzy_search(
+        domain_entities,
+        parsed.text,
+        usage_stats=usage_stats,
+        preferred_label=preferred_label,
+    )
     _dbg(f"search: {len(results)} results for {parsed.text!r}")
     return _build_search_output(results)
 
@@ -441,11 +490,17 @@ def _search_fuzzy(
     cache: EntityCache,
     parsed: ParsedQuery,
     usage_stats: dict[str, UsageRecord],
+    preferred_label: str,
 ) -> AlfredOutput:
     """Handle standard fuzzy search with optional domain suggestions."""
     all_entities = cache.get_all()
     _dbg(f"search: {len(all_entities)} entities in cache")
-    results = fuzzy_search(all_entities, parsed.text, usage_stats=usage_stats)
+    results = fuzzy_search(
+        all_entities,
+        parsed.text,
+        usage_stats=usage_stats,
+        preferred_label=preferred_label,
+    )
     _dbg(f"search: {len(results)} results for {parsed.text!r}")
     output = _build_search_output(results)
 

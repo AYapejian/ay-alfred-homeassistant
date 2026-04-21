@@ -49,6 +49,7 @@ This is a native macOS Alfred workflow — not a Home Assistant add-on. It runs 
 3. Open the workflow's configuration in Alfred and set:
    - `HA_URL` — your Home Assistant URL (e.g., `http://homeassistant.local:8123`)
    - `HA_TOKEN` — your long-lived access token
+   - `HA_PREFERRED_LABEL` *(optional)* — HA label slug that floats tagged entities to the top of search results. Defaults to `alfred_preferred`.
 4. Type `ha` in Alfred followed by your search query
 
 ## Usage
@@ -56,6 +57,10 @@ This is a native macOS Alfred workflow — not a Home Assistant add-on. It runs 
 - `ha <query>` — search entities. **Enter** runs the default action (toggle, turn on/off, etc.)
 - **Cmd + Enter** — open the action sub-menu for the selected entity
 - In the action sub-menu, select **Set Params...** to enter parameters like `brightness:100` or `color_temp_kelvin:3000`
+
+### Promoting entities to the top
+
+Create a label in Home Assistant (Settings → Areas & zones → Labels) named **Alfred Preferred** — HA stores it with the slug `alfred_preferred`. Tag any entity *or device* with it and those entities float above unlabeled ones in search results. Device-level labels propagate to every entity on that device. Your own usage history still takes priority over labeled entities. Override the slug with `HA_PREFERRED_LABEL` if you prefer a different label name.
 
 ## Development
 
