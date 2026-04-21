@@ -31,9 +31,7 @@ from ha_lib.cache import open_cache  # noqa: E402
 from ha_lib.config import Config  # noqa: E402
 from ha_lib.entities import Entity, get_action_params, get_domain_config  # noqa: E402
 from ha_lib.errors import handle_error  # noqa: E402
-from ha_lib.query_parser import parse_query  # noqa: E402
 from ha_workflow.alfred import AlfredIcon, AlfredItem, AlfredOutput  # noqa: E402
-from ha_workflow.quick_exec import build_quick_exec_output  # noqa: E402
 
 _SYSTEM_ICON = AlfredIcon(path="icons/_system.png")
 _DEBUG = os.environ.get("HA_DEBUG", "")
@@ -80,27 +78,6 @@ def _get_cached_entity(config: Config, entity_id: str) -> Optional[Entity]:
 def main() -> None:
     entity_id = os.environ.get("entity_id", "").strip()
     domain = os.environ.get("domain", "").strip()
-    query = " ".join(sys.argv[1:])
-
-    # Quick-exec in the submenu: if the user types a well-formed
-    # ``<domain>.<object_id> [params]`` query, render the quick-exec row
-    # instead of the regular submenu so the same syntax works anywhere.
-    parsed = parse_query(query)
-    if parsed.mode == "quick_exec" and parsed.entity_id:
-        try:
-            config = Config.from_env()
-            cache = open_cache(config)
-            try:
-                qx_output = build_quick_exec_output(
-                    cache, parsed.entity_id, parsed.raw_params or ""
-                )
-            finally:
-                cache.close()
-        except Exception:
-            qx_output = None
-        if qx_output is not None:
-            sys.stdout.write(qx_output.to_json() + "\n")
-            return
 
     if not entity_id:
         output = AlfredOutput(
