@@ -19,6 +19,7 @@ def _entity(
     entity_id: str = "light.living_room",
     state: str = "on",
     friendly_name: str = "Living Room Light",
+    labels: tuple[str, ...] = (),
     **extra_attrs: Any,
 ) -> Entity:
     domain = entity_id.split(".", 1)[0]
@@ -31,6 +32,7 @@ def _entity(
         attributes=attrs,
         last_changed="2026-03-20T10:00:00+00:00",
         last_updated="2026-03-20T10:00:00+00:00",
+        labels=labels,
     )
 
 
@@ -268,3 +270,90 @@ class TestOpenCache:
         db_file = tmp_path / "cache" / "entities.db"
         assert db_file.exists()
         cache.close()
+
+
+class TestLabels:
+    """Labels round-trip through the cache and legacy DBs migrate cleanly."""
+
+    def test_labels_default_empty(self) -> None:
+        cache = _mem_cache()
+        cache.refresh(SAMPLE_ENTITIES)
+        result = cache.get_all()
+        assert all(e.labels == () for e in result)
+        cache.close()
+
+    def test_labels_roundtrip(self) -> None:
+        cache = _mem_cache()
+        tagged = [
+            _entity(
+                "light.kitchen",
+                labels=("alfred_preferred", "favorite"),
+            ),
+        ]
+        cache.refresh(tagged)
+        result = cache.get_all()
+        assert result[0].labels == ("alfred_preferred", "favorite")
+        cache.close()
+
+    def test_labels_roundtrip_get_by_entity_id(self) -> None:
+        cache = _mem_cache()
+        cache.refresh([_entity("light.a", labels=("alfred_preferred",))])
+        e = cache.get_by_entity_id("light.a")
+        assert e is not None
+        assert e.labels == ("alfred_preferred",)
+        cache.close()
+
+    def test_labels_roundtrip_get_by_domain(self) -> None:
+        cache = _mem_cache()
+        cache.refresh([_entity("light.a", labels=("favorite",))])
+        results = cache.get_by_domain("light")
+        assert results[0].labels == ("favorite",)
+        cache.close()
+
+    def test_migration_from_legacy_schema(self, tmp_path: Path) -> None:
+        """A DB created without labels_json should auto-migrate on open."""
+        import sqlite3
+
+        db_path = tmp_path / "legacy.db"
+        conn = sqlite3.connect(str(db_path))
+        conn.executescript(
+            """
+            CREATE TABLE entities (
+                entity_id     TEXT PRIMARY KEY,
+                domain        TEXT NOT NULL,
+                state         TEXT NOT NULL,
+                friendly_name TEXT NOT NULL,
+                attributes_json TEXT NOT NULL,
+                last_changed  TEXT NOT NULL,
+                last_updated  TEXT NOT NULL,
+                area_name     TEXT NOT NULL DEFAULT '',
+                device_id     TEXT NOT NULL DEFAULT ''
+            );
+            CREATE TABLE cache_meta (key TEXT PRIMARY KEY, value TEXT NOT NULL);
+            """
+        )
+        conn.execute(
+            "INSERT INTO entities VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (
+                "light.old",
+                "light",
+                "on",
+                "Old Light",
+                "{}",
+                "",
+                "",
+                "",
+                "",
+            ),
+        )
+        conn.commit()
+        conn.close()
+
+        cache = EntityCache(db_path)
+        try:
+            result = cache.get_all()
+            assert len(result) == 1
+            assert result[0].entity_id == "light.old"
+            assert result[0].labels == ()
+        finally:
+            cache.close()

@@ -23,6 +23,7 @@ def _entity(
     state: str = "on",
     friendly_name: str = "Living Room Light",
     area_name: str = "",
+    labels: tuple[str, ...] = (),
     **extra_attrs: Any,
 ) -> Entity:
     domain = entity_id.split(".", 1)[0]
@@ -36,6 +37,7 @@ def _entity(
         last_changed="",
         last_updated="",
         area_name=area_name,
+        labels=labels,
     )
 
 
@@ -442,3 +444,147 @@ class TestUsageBoost:
         ids = [e.entity_id for e in results]
         # roborock doesn't match "kitchen" regardless of usage
         assert "vacuum.roborock" not in ids
+
+
+# ---------------------------------------------------------------------------
+# Preferred-label tiering
+# ---------------------------------------------------------------------------
+
+
+class TestPreferredLabel:
+    """Tests for the ``preferred_label`` tiering in fuzzy_search."""
+
+    def test_no_label_is_noop(self) -> None:
+        """Without preferred_label, ordering matches the legacy behavior."""
+        entities = [
+            _entity("light.a", friendly_name="Kitchen Light A"),
+            _entity("light.b", friendly_name="Kitchen Light B", labels=("foo",)),
+        ]
+        r_without = fuzzy_search(entities, "kitchen")
+        r_with = fuzzy_search(entities, "kitchen", preferred_label=None)
+        assert [e.entity_id for e in r_without] == [e.entity_id for e in r_with]
+
+    def test_labeled_entity_floats_above_unlabeled(self) -> None:
+        """Given equal fuzzy scores, the labeled entity ranks first."""
+        entities = [
+            _entity("light.a", friendly_name="Kitchen Light A"),
+            _entity(
+                "light.b",
+                friendly_name="Kitchen Light B",
+                labels=("alfred_preferred",),
+            ),
+        ]
+        results = fuzzy_search(
+            entities, "kitchen light", preferred_label="alfred_preferred"
+        )
+        assert results[0].entity_id == "light.b"
+
+    def test_label_match_is_case_insensitive(self) -> None:
+        """Matching is case-insensitive on both sides."""
+        entities = [
+            _entity("light.a", friendly_name="Kitchen Light A"),
+            _entity(
+                "light.b",
+                friendly_name="Kitchen Light B",
+                labels=("Alfred_Preferred",),
+            ),
+        ]
+        results = fuzzy_search(
+            entities, "kitchen light", preferred_label="ALFRED_PREFERRED"
+        )
+        assert results[0].entity_id == "light.b"
+
+    def test_usage_beats_preferred(self) -> None:
+        """An entity with usage history outranks a labeled entity without usage."""
+        from ha_workflow.usage import UsageRecord
+
+        now = 1000000.0
+        entities = [
+            _entity(
+                "light.labeled",
+                friendly_name="Labeled Light",
+                labels=("alfred_preferred",),
+            ),
+            _entity("light.used", friendly_name="Used Light"),
+        ]
+        stats = {"light.used": UsageRecord("light.used", 5, now)}
+        results = fuzzy_search(
+            entities,
+            "light",
+            usage_stats=stats,
+            now=now,
+            preferred_label="alfred_preferred",
+        )
+        ids = [e.entity_id for e in results]
+        assert ids.index("light.used") < ids.index("light.labeled")
+
+    def test_labeled_beats_stronger_fuzzy_match_in_rest_tier(self) -> None:
+        """Across tiers, a labeled entity ranks above one with a better fuzzy
+        score that is not labeled and has no usage.
+        """
+        entities = [
+            _entity("light.exact_kitchen", friendly_name="Kitchen Light"),
+            _entity(
+                "light.weird",
+                friendly_name="Lightning Kit Chen Extender",
+                labels=("alfred_preferred",),
+            ),
+        ]
+        results = fuzzy_search(
+            entities, "kitchen light", preferred_label="alfred_preferred"
+        )
+        # The labeled entity is in tier 1, the unlabeled is in tier 2,
+        # so the labeled one must come first even with a weaker fuzzy score.
+        assert results[0].entity_id == "light.weird"
+
+    def test_empty_query_tier_ordering(self) -> None:
+        """Empty query: usage -> preferred (alpha) -> rest (alpha)."""
+        from ha_workflow.usage import UsageRecord
+
+        now = 1000000.0
+        entities = [
+            _entity("light.rest_z", friendly_name="Z Rest"),
+            _entity("light.rest_a", friendly_name="A Rest"),
+            _entity(
+                "light.pref_z",
+                friendly_name="Z Preferred",
+                labels=("alfred_preferred",),
+            ),
+            _entity(
+                "light.pref_a",
+                friendly_name="A Preferred",
+                labels=("alfred_preferred",),
+            ),
+            _entity("light.used", friendly_name="M Used"),
+        ]
+        stats = {"light.used": UsageRecord("light.used", 3, now)}
+        results = fuzzy_search(
+            entities,
+            "",
+            usage_stats=stats,
+            now=now,
+            preferred_label="alfred_preferred",
+        )
+        ids = [e.entity_id for e in results]
+        assert ids == [
+            "light.used",
+            "light.pref_a",
+            "light.pref_z",
+            "light.rest_a",
+            "light.rest_z",
+        ]
+
+    def test_unmatched_entities_still_excluded(self) -> None:
+        """A labeled entity that does not match the query is still excluded."""
+        entities = [
+            _entity(
+                "light.unrelated",
+                friendly_name="Garage Door",
+                labels=("alfred_preferred",),
+            ),
+            _entity("light.kitchen", friendly_name="Kitchen Light"),
+        ]
+        results = fuzzy_search(entities, "kitchen", preferred_label="alfred_preferred")
+        ids = [e.entity_id for e in results]
+        assert "light.unrelated" not in ids
+        assert "light.kitchen" in ids
