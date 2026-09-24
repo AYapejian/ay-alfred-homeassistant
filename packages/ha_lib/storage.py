@@ -8,12 +8,13 @@ can never mix or clobber another server's data::
     <cache_dir>/servers/<key>/.refresh.lock   background-refresh PID file
     <cache_dir>/servers/<key>/refresh.log     background-refresh output
     <data_dir>/servers/<key>/usage.db         usage history (survives cache wipes)
-    <data_dir>/servers/<key>/server.json      non-secret debug info (URL, created)
+    <data_dir>/servers/<key>/server.json      non-secret debug info (URL, profile)
     <data_dir>/servers/.legacy-migrated       one-time migration marker
 
 Before per-server storage existed these files sat flat in ``cache_dir`` /
 ``data_dir``.  :func:`migrate_legacy_storage` moves them — once — into the
-directory of whichever server is configured at upgrade time.
+directory of the default server (``HA_URL``) configured at upgrade time.
+Legacy files predate server profiles, so they never belong to one.
 """
 
 from __future__ import annotations
@@ -27,6 +28,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from ha_lib.config import Config, normalize_server_url
+from ha_lib.profiles import DEFAULT_PROFILE_ID
 
 SERVERS_DIRNAME = "servers"
 SERVER_INFO_FILENAME = "server.json"
@@ -57,7 +59,10 @@ def prepare_server_storage(config: Config) -> None:
     os.makedirs(config.server_cache_dir, exist_ok=True)
     os.makedirs(config.server_data_dir, exist_ok=True)
     try:
-        migrate_legacy_storage(config)
+        # Legacy files come from the pre-profiles, single-server layout: only
+        # the default server may inherit them.
+        if config.server_id == DEFAULT_PROFILE_ID:
+            migrate_legacy_storage(config)
     except OSError as exc:
         # A failed migration (e.g. a permission error) must not break search:
         # no marker is written, so the next invocation retries.  A legacy file
@@ -142,15 +147,30 @@ def _move_legacy(
 
 
 def _write_server_info(config: Config) -> None:
-    """Write ``server.json`` (URL, key, created) once; never the token."""
+    """Write ``server.json`` (URL, key, profile, created); never the token.
+
+    Rewritten only when the URL or profile name/id changed (a profile's URL
+    or name can be edited without changing its storage key).
+    """
     path = config.server_data_dir / SERVER_INFO_FILENAME
-    if path.exists():
-        return
-    info = {
+    wanted = {
         "url": normalize_server_url(config.ha_url),
         "key": config.server_key,
-        "created": _now_iso(),
+        "profile_id": config.server_id,
+        "profile_name": config.server_display_name,
     }
+    info: dict[str, object] = {}
+    if path.exists():
+        try:
+            loaded = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            loaded = {}
+        if isinstance(loaded, dict):
+            info = loaded
+        if all(info.get(k) == v for k, v in wanted.items()):
+            return
+    info.update(wanted)
+    info.setdefault("created", _now_iso())
     fd, tmp_name = tempfile.mkstemp(
         dir=str(config.server_data_dir), prefix=".server.", suffix=".tmp"
     )
