@@ -10,6 +10,7 @@ from typing import Optional
 from ha_lib.errors import ConfigError
 
 _DEFAULT_CACHE_TTL = 60
+_DEFAULT_PREFERRED_LABEL = "alfred_preferred"
 
 
 @dataclass(frozen=True)
@@ -26,6 +27,7 @@ class Config:
     cache_ttl: int
     cache_dir: Path
     data_dir: Path
+    preferred_label: str = _DEFAULT_PREFERRED_LABEL
 
     @classmethod
     def from_env(cls, env: Optional[dict[str, str]] = None) -> Config:
@@ -73,10 +75,16 @@ class Config:
             env.get("alfred_workflow_data", "").strip() or str(dev_fallback / "data")
         )
 
+        preferred_label = (
+            env.get("HA_PREFERRED_LABEL", "").strip().lower()
+            or _DEFAULT_PREFERRED_LABEL
+        )
+
         return cls(
             ha_url=ha_url,
             ha_token=ha_token,
             cache_ttl=cache_ttl,
             cache_dir=cache_dir,
             data_dir=data_dir,
+            preferred_label=preferred_label,
         )

@@ -1,7 +1,7 @@
 # Project Status
 
 **Project:** ay-alfred-homeassistant
-**Last updated:** 2026-03-21
+**Last updated:** 2026-04-21
 
 ---
 
@@ -9,8 +9,8 @@
 
 | Item | Value |
 |------|-------|
-| **Current phase** | Phase 3 — Actions & Entity Interaction |
-| **Active branch** | — (next: `feat/phase-3-actions`) |
+| **Current phase** | Phase 1.6 — Preferred-label prioritization (in progress) / Phase 3 queued |
+| **Active branch** | `feat/38-preferred-label` |
 | **Last completed phase** | Phase 1.5 — Enhanced Search |
 | **Last commit on main** | `bae99ed` — Phase 1.5 merged |
 | **Blockers** | None |
@@ -30,6 +30,7 @@
 | 2026-03-20 | **CI/packaging early (Phase 0)** | Every phase produces a testable `.alfredworkflow` artifact. |
 | 2026-03-21 | **No `uid` on entity items** | Prevents Alfred's built-in learning from overriding our usage-based ranking. Our fuzzy search + usage boost has full control over ordering. |
 | 2026-03-21 | **System commands via search** | System actions (cache refresh, usage clear) surface as search results with `__system__` entity_id, distinct icon, and "System" subtitle. Dispatched through `_cmd_action` → `_cmd_system_action`. |
+| 2026-04-21 | **Preferred-label tiering (not weight)** | Search results are grouped into explicit tiers: usage history → labeled (`HA_PREFERRED_LABEL`, default `alfred_preferred`) → everything else. Device-level labels propagate to child entities; area labels do not. Keeps the "usage wins" contract explicit instead of tuning weights. |
 
 ---
 
@@ -41,6 +42,7 @@
 | 1 | Configuration & HA Client | **Done** | `feat/phase-1-config-ha-client` | `48462ac` on main |
 | 2 | Entity Cache & Search | **Done** | `feat/phase-2-cache-search` | `1a48cc8` on main |
 | 1.5 | Enhanced Search | **Done** | `feat/phase-1.5-enhanced-search` | `bae99ed` on main |
+| 1.6 | Preferred-label prioritization | **In progress** | `feat/38-preferred-label` | — |
 | 3 | Actions & Entity Interaction | **Next** | — | — |
 | 4 | Polish & Usability | Planned | — | — |
 | 5 | WebSocket Listener | Deferred | — | — |

@@ -40,7 +40,8 @@ class EntityCache:
                 last_changed  TEXT NOT NULL,
                 last_updated  TEXT NOT NULL,
                 area_name     TEXT NOT NULL DEFAULT '',
-                device_id     TEXT NOT NULL DEFAULT ''
+                device_id     TEXT NOT NULL DEFAULT '',
+                labels_json   TEXT NOT NULL DEFAULT '[]'
             );
 
             CREATE INDEX IF NOT EXISTS idx_entities_domain
@@ -58,6 +59,7 @@ class EntityCache:
         for col, ddl in (
             ("area_name", "area_name TEXT NOT NULL DEFAULT ''"),
             ("device_id", "device_id TEXT NOT NULL DEFAULT ''"),
+            ("labels_json", "labels_json TEXT NOT NULL DEFAULT '[]'"),
         ):
             try:
                 self._conn.execute(f"SELECT {col} FROM entities LIMIT 1")
@@ -76,8 +78,9 @@ class EntityCache:
         cur.executemany(
             "INSERT INTO entities "
             "(entity_id, domain, state, friendly_name, "
-            "attributes_json, last_changed, last_updated, area_name, device_id) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            "attributes_json, last_changed, last_updated, area_name, device_id, "
+            "labels_json) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             [
                 (
                     e.entity_id,
@@ -89,6 +92,7 @@ class EntityCache:
                     e.last_updated,
                     e.area_name,
                     e.device_id,
+                    json.dumps(list(e.labels)),
                 )
                 for e in entities
             ],
@@ -103,7 +107,8 @@ class EntityCache:
         """Return every cached entity."""
         cur = self._conn.execute(
             "SELECT entity_id, domain, state, friendly_name, "
-            "attributes_json, last_changed, last_updated, area_name, device_id "
+            "attributes_json, last_changed, last_updated, area_name, device_id, "
+            "labels_json "
             "FROM entities"
         )
         return [self._row_to_entity(row) for row in cur.fetchall()]
@@ -112,7 +117,8 @@ class EntityCache:
         """Return the cached entity with *entity_id*, or ``None`` if missing."""
         cur = self._conn.execute(
             "SELECT entity_id, domain, state, friendly_name, "
-            "attributes_json, last_changed, last_updated, area_name, device_id "
+            "attributes_json, last_changed, last_updated, area_name, device_id, "
+            "labels_json "
             "FROM entities WHERE entity_id = ?",
             (entity_id,),
         )
@@ -123,7 +129,8 @@ class EntityCache:
         """Return all cached entities in the given *domain*."""
         cur = self._conn.execute(
             "SELECT entity_id, domain, state, friendly_name, "
-            "attributes_json, last_changed, last_updated, area_name, device_id "
+            "attributes_json, last_changed, last_updated, area_name, device_id, "
+            "labels_json "
             "FROM entities WHERE domain = ?",
             (domain,),
         )
@@ -141,7 +148,8 @@ class EntityCache:
         pattern = f"%{query}%"
         cur = self._conn.execute(
             "SELECT entity_id, domain, state, friendly_name, "
-            "attributes_json, last_changed, last_updated, area_name, device_id "
+            "attributes_json, last_changed, last_updated, area_name, device_id, "
+            "labels_json "
             "FROM entities "
             "WHERE entity_id LIKE ? OR friendly_name LIKE ?",
             (pattern, pattern),
@@ -175,6 +183,12 @@ class EntityCache:
 
     @staticmethod
     def _row_to_entity(row: tuple[Any, ...]) -> Entity:
+        raw_labels = row[9] if len(row) > 9 else "[]"
+        try:
+            labels_list = json.loads(raw_labels) if raw_labels else []
+        except (TypeError, ValueError):
+            labels_list = []
+        labels = tuple(str(label) for label in labels_list if label)
         return Entity(
             entity_id=row[0],
             domain=row[1],
@@ -185,6 +199,7 @@ class EntityCache:
             last_updated=row[6],
             area_name=row[7],
             device_id=row[8],
+            labels=labels,
         )
 
 

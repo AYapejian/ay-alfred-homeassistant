@@ -298,11 +298,17 @@ def main() -> None:
                 if parsed.mode == "regex":
                     output = _search_regex(cache, parsed)
                 elif parsed.mode == "quick_exec":
-                    output = _quick_exec(cache, parsed, usage_stats, query)
+                    output = _quick_exec(
+                        cache, parsed, usage_stats, query, config.preferred_label
+                    )
                 elif parsed.domain_filter:
-                    output = _search_domain_filtered(cache, parsed, usage_stats, query)
+                    output = _search_domain_filtered(
+                        cache, parsed, usage_stats, query, config.preferred_label
+                    )
                 else:
-                    output = _search_fuzzy(cache, parsed, usage_stats, query)
+                    output = _search_fuzzy(
+                        cache, parsed, usage_stats, query, config.preferred_label
+                    )
 
                 if needs_refresh:
                     output.rerun = 1.0
@@ -338,10 +344,14 @@ def _search_domain_filtered(
     parsed: ParsedQuery,
     usage_stats: dict[str, UsageRecord],
     query: str,
+    preferred_label: str,
 ) -> AlfredOutput:
     domain_entities = cache.get_by_domain(parsed.domain_filter or "")
     results = _lib_search.fuzzy_search(
-        domain_entities, parsed.text, usage_stats=usage_stats
+        domain_entities,
+        parsed.text,
+        usage_stats=usage_stats,
+        preferred_label=preferred_label,
     )
     return _build_search_output(results, query)
 
@@ -365,6 +375,7 @@ def _quick_exec(
     parsed: ParsedQuery,
     usage_stats: dict[str, UsageRecord],
     query: str,
+    preferred_label: str,
 ) -> AlfredOutput:
     """Build an Alfred output for the quick-exec syntax.
 
@@ -384,7 +395,7 @@ def _quick_exec(
             domain_filter=None,
             regex_pattern=None,
         )
-        return _search_fuzzy(cache, fallback, usage_stats, query)
+        return _search_fuzzy(cache, fallback, usage_stats, query, preferred_label)
 
     dc = get_domain_config(entity.domain)
 
@@ -449,10 +460,14 @@ def _search_fuzzy(
     parsed: ParsedQuery,
     usage_stats: dict[str, UsageRecord],
     query: str,
+    preferred_label: str,
 ) -> AlfredOutput:
     all_entities = cache.get_all()
     results = _lib_search.fuzzy_search(
-        all_entities, parsed.text, usage_stats=usage_stats
+        all_entities,
+        parsed.text,
+        usage_stats=usage_stats,
+        preferred_label=preferred_label,
     )
     output = _build_search_output(results, query)
 

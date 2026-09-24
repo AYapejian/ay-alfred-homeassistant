@@ -168,6 +168,16 @@ def regex_search(
     return results
 
 
+def _is_preferred(entity: Entity, preferred_label: Optional[str]) -> bool:
+    """Return ``True`` if *entity* carries the configured preferred label."""
+    if not preferred_label:
+        return False
+    target = preferred_label.strip().lower()
+    if not target:
+        return False
+    return any(label.strip().lower() == target for label in entity.labels)
+
+
 def fuzzy_search(
     entities: list[Entity],
     query: str,
@@ -175,6 +185,7 @@ def fuzzy_search(
     max_results: int = 50,
     usage_stats: Optional[dict[str, UsageRecord]] = None,
     now: Optional[float] = None,
+    preferred_label: Optional[str] = None,
 ) -> list[Entity]:
     """Score and rank *entities* against *query*.
 
@@ -185,31 +196,58 @@ def fuzzy_search(
     score to prefer recently and frequently used entities.  An empty
     *query* returns entities sorted by usage score (most-used first),
     falling back to alphabetical order for entities with no usage history.
+
+    When *preferred_label* is provided, results are grouped into three
+    tiers within which the existing ordering applies:
+
+    1. Entities with a usage record (ordered by combined score).
+    2. Entities tagged with *preferred_label* but not yet used.
+    3. Everything else.
     """
     query = query.strip()
     ts = now if now is not None else time.time()
 
+    def _has_usage(entity_id: str) -> bool:
+        if not usage_stats:
+            return False
+        rec = usage_stats.get(entity_id)
+        return rec is not None and rec.use_count > 0
+
     if not query:
-        if usage_stats:
-            # Sort by usage score descending, then alphabetically
-            return sorted(
-                entities,
-                key=lambda e: (
-                    -_usage_score(e.entity_id, usage_stats, ts),
-                    e.friendly_name.lower(),
-                ),
-            )[:max_results]
-        return entities[:max_results]
 
-    scored: list[tuple[float, int, Entity]] = []
+        def _empty_key(e: Entity) -> tuple[int, float, str]:
+            if _has_usage(e.entity_id):
+                group = 0
+            elif _is_preferred(e, preferred_label):
+                group = 1
+            else:
+                group = 2
+            usage_score = (
+                -_usage_score(e.entity_id, usage_stats, ts) if usage_stats else 0.0
+            )
+            return (group, usage_score, e.friendly_name.lower())
+
+        return sorted(entities, key=_empty_key)[:max_results]
+
+    scored: list[tuple[int, float, int, Entity]] = []
     for idx, entity in enumerate(entities):
-        s = _score_entity_multi(entity, query)
-        if s > 0:
-            if usage_stats:
-                s += _usage_score(entity.entity_id, usage_stats, ts)
-            scored.append((s, idx, entity))
+        fuzzy = _score_entity_multi(entity, query)
+        if fuzzy <= 0:
+            continue
+        combined = fuzzy
+        if usage_stats:
+            combined += _usage_score(entity.entity_id, usage_stats, ts)
 
-    # Sort by score descending, then original order for stability
-    scored.sort(key=lambda x: (-x[0], x[1]))
+        if _has_usage(entity.entity_id):
+            group = 0
+        elif _is_preferred(entity, preferred_label):
+            group = 1
+        else:
+            group = 2
 
-    return [entity for _, _, entity in scored[:max_results]]
+        scored.append((group, -combined, idx, entity))
+
+    # Tier first, then combined score descending, then original order for stability.
+    scored.sort(key=lambda x: (x[0], x[1], x[2]))
+
+    return [entity for _, _, _, entity in scored[:max_results]]

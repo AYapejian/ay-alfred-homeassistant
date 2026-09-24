@@ -126,6 +126,16 @@ class TestFromStateDict:
         e = Entity.from_state_dict(data, device_id="abc123")
         assert e.device_id == "abc123"
 
+    def test_labels_default_empty(self) -> None:
+        e = Entity.from_state_dict(_state_dict())
+        assert e.labels == ()
+
+    def test_labels_passed_through(self) -> None:
+        e = Entity.from_state_dict(
+            _state_dict(), labels=("alfred_preferred", "favorite")
+        )
+        assert e.labels == ("alfred_preferred", "favorite")
+
 
 class TestDeviceClass:
     def test_present(self) -> None:

@@ -76,3 +76,19 @@ class TestConfigFromEnv:
         home = Path.home()
         assert cfg.cache_dir == home / ".cache" / "ha-workflow" / "cache"
         assert cfg.data_dir == home / ".cache" / "ha-workflow" / "data"
+
+    def test_preferred_label_default(self) -> None:
+        cfg = Config.from_env(_base_env())
+        assert cfg.preferred_label == "alfred_preferred"
+
+    def test_preferred_label_override(self) -> None:
+        env = {**_base_env(), "HA_PREFERRED_LABEL": "my_favorites"}
+        assert Config.from_env(env).preferred_label == "my_favorites"
+
+    def test_preferred_label_lowercased(self) -> None:
+        env = {**_base_env(), "HA_PREFERRED_LABEL": "  MixedCaseLabel  "}
+        assert Config.from_env(env).preferred_label == "mixedcaselabel"
+
+    def test_preferred_label_empty_falls_back_to_default(self) -> None:
+        env = {**_base_env(), "HA_PREFERRED_LABEL": "   "}
+        assert Config.from_env(env).preferred_label == "alfred_preferred"

@@ -30,6 +30,7 @@ class Entity:
     last_updated: str
     area_name: str = ""
     device_id: str = ""
+    labels: tuple[str, ...] = ()
 
     @classmethod
     def from_state_dict(
@@ -37,6 +38,7 @@ class Entity:
         data: dict[str, Any],
         area_name: str = "",
         device_id: str = "",
+        labels: tuple[str, ...] = (),
     ) -> Entity:
         """Convert an HA REST API state dict to an :class:`Entity`."""
         entity_id: str = data["entity_id"]
@@ -52,6 +54,7 @@ class Entity:
             last_updated=data.get("last_updated", ""),
             area_name=area_name,
             device_id=device_id,
+            labels=labels,
         )
 
     @property
