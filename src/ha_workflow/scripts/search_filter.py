@@ -33,7 +33,12 @@ from ha_lib.entities import Entity, get_domain_config  # noqa: E402
 from ha_lib.errors import ConfigError, handle_error  # noqa: E402
 from ha_lib.inference import infer_action  # noqa: E402
 from ha_lib.params import extract_param_keys, parse_service_params  # noqa: E402
-from ha_lib.profiles import load_servers, resolve_server_id  # noqa: E402
+from ha_lib.profiles import (  # noqa: E402
+    SERVER_ENV_VAR,
+    load_servers,
+    resolve_server_id,
+    tag_action,
+)
 from ha_lib.query_parser import ParsedQuery, parse_query  # noqa: E402
 from ha_lib.storage import read_server_status  # noqa: E402
 from ha_lib.usage import UsageRecord, open_usage_tracker  # noqa: E402
@@ -134,7 +139,7 @@ def _match_system_commands(query: str, config: Config) -> list[AlfredItem]:
                 uid=f"system_{cmd['action']}",
                 variables={
                     "entity_id": _SYSTEM_ENTITY,
-                    "action": cmd["action"],
+                    "action": tag_action(cmd["action"], config.server_id),
                     "domain": "__system__",
                 },
                 valid=True,
@@ -143,8 +148,15 @@ def _match_system_commands(query: str, config: Config) -> list[AlfredItem]:
     return items
 
 
-def _build_search_output(entities: list[Entity], query: str = "") -> AlfredOutput:
-    """Convert a list of entities to Alfred Script Filter JSON."""
+def _build_search_output(
+    entities: list[Entity], config: Config, query: str = ""
+) -> AlfredOutput:
+    """Convert a list of entities to Alfred Script Filter JSON.
+
+    Every action carries ``@@<server id>`` so the runner acts on the server
+    whose cache produced the item.
+    """
+    sid = config.server_id
     items: list[AlfredItem] = []
     for entity in entities:
         dc = get_domain_config(entity.domain)
@@ -160,7 +172,9 @@ def _build_search_output(entities: list[Entity], query: str = "") -> AlfredOutpu
             autocomplete=entity.friendly_name,
             variables={
                 "entity_id": entity.entity_id,
-                "action": dc.default_action,
+                "action": (
+                    tag_action(dc.default_action, sid) if dc.default_action else ""
+                ),
                 "domain": entity.domain,
             },
             valid=bool(dc.default_action),
@@ -171,6 +185,8 @@ def _build_search_output(entities: list[Entity], query: str = "") -> AlfredOutpu
                     variables={
                         "entity_id": entity.entity_id,
                         "domain": entity.domain,
+                        # No action yet \u2014 only the server the sub-menu is for.
+                        "action": tag_action("", sid),
                     },
                 ),
                 "alt": AlfredMod(
@@ -179,7 +195,7 @@ def _build_search_output(entities: list[Entity], query: str = "") -> AlfredOutpu
                     variables={
                         "entity_id": entity.entity_id,
                         "domain": entity.domain,
-                        "action": "copy_entity_id",
+                        "action": tag_action("copy_entity_id", sid),
                     },
                 ),
                 "ctrl": AlfredMod(
@@ -188,7 +204,7 @@ def _build_search_output(entities: list[Entity], query: str = "") -> AlfredOutpu
                     variables={
                         "entity_id": entity.entity_id,
                         "domain": entity.domain,
-                        "action": "open_entity",
+                        "action": tag_action("open_entity", sid),
                     },
                 ),
             },
@@ -248,7 +264,9 @@ def _maybe_refresh_background(config: Config) -> None:
     os.makedirs(str(config.server_cache_dir), exist_ok=True)
     log_file = open(str(log_path), "w")  # noqa: SIM115
 
-    bg_env = {**os.environ, "HA_DEBUG": "1"}
+    # Pin the child to this server: a switch between spawn and run must not
+    # write one server's entities into another's cache.
+    bg_env = {**os.environ, "HA_DEBUG": "1", SERVER_ENV_VAR: config.server_id}
     proc = subprocess.Popen(
         [sys.executable, cli_path, "cache", "refresh"],
         cwd=_WORKFLOW_ROOT,
@@ -343,19 +361,15 @@ def main() -> None:
                 _dbg(f"search: parsed mode={parsed.mode} domain={parsed.domain_filter}")
 
                 if parsed.mode == "regex":
-                    output = _search_regex(cache, parsed)
+                    output = _search_regex(cache, parsed, config)
                 elif parsed.mode == "quick_exec":
-                    output = _quick_exec(
-                        cache, parsed, usage_stats, query, config.preferred_label
-                    )
+                    output = _quick_exec(cache, parsed, usage_stats, query, config)
                 elif parsed.domain_filter:
                     output = _search_domain_filtered(
-                        cache, parsed, usage_stats, query, config.preferred_label
+                        cache, parsed, usage_stats, query, config
                     )
                 else:
-                    output = _search_fuzzy(
-                        cache, parsed, usage_stats, query, config.preferred_label
-                    )
+                    output = _search_fuzzy(cache, parsed, usage_stats, query, config)
 
                 if needs_refresh:
                     output.rerun = 1.0
@@ -369,11 +383,12 @@ def main() -> None:
 def _search_regex(
     cache: _lib_cache.EntityCache,
     parsed: ParsedQuery,
+    config: Config,
 ) -> AlfredOutput:
     all_entities = cache.get_all()
     try:
         results = _lib_search.regex_search(all_entities, parsed.regex_pattern or "")
-        return _build_search_output(results, "")
+        return _build_search_output(results, config, "")
     except re.error as exc:
         return AlfredOutput(
             items=[
@@ -391,16 +406,16 @@ def _search_domain_filtered(
     parsed: ParsedQuery,
     usage_stats: dict[str, UsageRecord],
     query: str,
-    preferred_label: str,
+    config: Config,
 ) -> AlfredOutput:
     domain_entities = cache.get_by_domain(parsed.domain_filter or "")
     results = _lib_search.fuzzy_search(
         domain_entities,
         parsed.text,
         usage_stats=usage_stats,
-        preferred_label=preferred_label,
+        preferred_label=config.preferred_label,
     )
-    return _build_search_output(results, query)
+    return _build_search_output(results, config, query)
 
 
 def _format_param_summary(parsed: dict[str, object]) -> str:
@@ -422,7 +437,7 @@ def _quick_exec(
     parsed: ParsedQuery,
     usage_stats: dict[str, UsageRecord],
     query: str,
-    preferred_label: str,
+    config: Config,
 ) -> AlfredOutput:
     """Build an Alfred output for the quick-exec syntax.
 
@@ -442,7 +457,7 @@ def _quick_exec(
             domain_filter=None,
             regex_pattern=None,
         )
-        return _search_fuzzy(cache, fallback, usage_stats, query, preferred_label)
+        return _search_fuzzy(cache, fallback, usage_stats, query, config)
 
     dc = get_domain_config(entity.domain)
 
@@ -493,7 +508,7 @@ def _quick_exec(
         icon=AlfredIcon(path=dc.icon_path),
         variables={
             "entity_id": entity.entity_id,
-            "action": action,
+            "action": tag_action(action, config.server_id),
             "domain": entity.domain,
             "params": raw_params,
         },
@@ -507,16 +522,16 @@ def _search_fuzzy(
     parsed: ParsedQuery,
     usage_stats: dict[str, UsageRecord],
     query: str,
-    preferred_label: str,
+    config: Config,
 ) -> AlfredOutput:
     all_entities = cache.get_all()
     results = _lib_search.fuzzy_search(
         all_entities,
         parsed.text,
         usage_stats=usage_stats,
-        preferred_label=preferred_label,
+        preferred_label=config.preferred_label,
     )
-    output = _build_search_output(results, query)
+    output = _build_search_output(results, config, query)
 
     if parsed.text:
         domain_counts = cache.get_domain_counts()

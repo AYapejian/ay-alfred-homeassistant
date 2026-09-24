@@ -34,9 +34,10 @@ from ha_lib.actions import dispatch_action  # noqa: E402
 from ha_lib.cache import open_cache  # noqa: E402
 from ha_lib.client import HAClient  # noqa: E402
 from ha_lib.config import Config  # noqa: E402
-from ha_lib.errors import handle_error  # noqa: E402
+from ha_lib.errors import HAWorkflowError, handle_error  # noqa: E402
 from ha_lib.notify import notify, notify_error  # noqa: E402
 from ha_lib.params import parse_service_params  # noqa: E402
+from ha_lib.profiles import SERVER_ENV_VAR, split_action  # noqa: E402
 from ha_lib.server_actions import (  # noqa: E402
     ServerActionContext,
     run_server_action,
@@ -324,9 +325,23 @@ def _cmd_system(config: Config, action: str) -> None:
 
 
 def main() -> None:
+    """Run the action; configuration problems become a plain notification."""
+    try:
+        _main()
+    except HAWorkflowError as exc:
+        # Run Script output is the notification text: keep it readable.
+        notify_error(str(exc))
+
+
+def _main() -> None:
     entity_id = os.environ.get("entity_id", "").strip()
-    action = os.environ.get("action", "").strip()
+    action, server_id = split_action(os.environ.get("action", "").strip())
     domain = os.environ.get("domain", "").strip()
+    if server_id:
+        # The item names the server whose cache produced it.  Every
+        # Config.from_env() below (and any child process) resolves that
+        # server, never whichever one happens to be active now.
+        os.environ[SERVER_ENV_VAR] = server_id
     # Phase D: params come cleanly via Alfred variable — no ::encoding hack
     raw_params = os.environ.get("params", "").strip()
 

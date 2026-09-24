@@ -47,7 +47,12 @@ from ha_workflow.notify import (  # noqa: E402
     notify_error,
 )
 from ha_workflow.params import parse_service_params  # noqa: E402
-from ha_workflow.profiles import load_servers, resolve_server_id  # noqa: E402
+from ha_workflow.profiles import (  # noqa: E402
+    SERVER_ENV_VAR,
+    load_servers,
+    resolve_server_id,
+    split_action,
+)
 from ha_workflow.query_parser import ParsedQuery, parse_query  # noqa: E402
 from ha_workflow.search import fuzzy_search, regex_search  # noqa: E402
 from ha_workflow.server_menu import (  # noqa: E402
@@ -302,7 +307,8 @@ def _maybe_refresh_background(config: Config) -> None:
     os.makedirs(str(config.server_cache_dir), exist_ok=True)
     log_file = open(str(log_path), "w")  # noqa: SIM115
 
-    bg_env = {**os.environ, "HA_DEBUG": "1"}
+    # Pin the child to this server (see search_filter.py).
+    bg_env = {**os.environ, "HA_DEBUG": "1", SERVER_ENV_VAR: config.server_id}
     proc = subprocess.Popen(
         [sys.executable, cli_path, "cache", "refresh"],
         cwd=_WORKFLOW_ROOT,
@@ -626,7 +632,10 @@ def _cmd_cache(args: list[str]) -> None:
 def _cmd_action(args: list[str]) -> None:
     """Execute an action on an entity (or system command)."""
     entity_id = args[0] if args else ""
-    action = args[1] if len(args) > 1 else ""
+    action, server_id = split_action(args[1] if len(args) > 1 else "")
+    if server_id:
+        # Act on the server the item came from (see action_runner.py).
+        os.environ[SERVER_ENV_VAR] = server_id
 
     if entity_id == _SYSTEM_ENTITY:
         _cmd_system_action(action)

@@ -31,7 +31,13 @@ from ha_lib.cache import open_cache  # noqa: E402
 from ha_lib.config import Config, workflow_dirs  # noqa: E402
 from ha_lib.entities import Entity, get_action_params, get_domain_config  # noqa: E402
 from ha_lib.errors import ConfigError, handle_error  # noqa: E402
-from ha_lib.profiles import load_servers, resolve_server_id  # noqa: E402
+from ha_lib.profiles import (  # noqa: E402
+    SERVER_ENV_VAR,
+    load_servers,
+    resolve_server_id,
+    split_action,
+    tag_action,
+)
 from ha_workflow.alfred import AlfredIcon, AlfredItem, AlfredOutput  # noqa: E402
 from ha_workflow.server_menu import (  # noqa: E402
     SERVER_ENTITY,
@@ -140,8 +146,15 @@ def main() -> None:
 
     dc = get_domain_config(domain)
 
+    # The search item says which server it came from (``@@<server id>``):
+    # read that server's cache and tag every action with it.
+    _, server_id = split_action(os.environ.get("action", "").strip())
+    env = dict(os.environ)
+    if server_id:
+        env[SERVER_ENV_VAR] = server_id
+
     try:
-        config = Config.from_env()
+        config = Config.from_env(env)
         entity = _get_cached_entity(config, entity_id)
     except Exception:
         entity = None
@@ -336,6 +349,13 @@ def main() -> None:
             valid=True,
         )
     )
+
+    if server_id:
+        for item in items:
+            if item.variables and "action" in item.variables:
+                item.variables["action"] = tag_action(
+                    item.variables["action"], server_id
+                )
 
     output = AlfredOutput(items=items)
     sys.stdout.write(output.to_json() + "\n")

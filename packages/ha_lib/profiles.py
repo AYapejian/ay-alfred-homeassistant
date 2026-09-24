@@ -46,6 +46,8 @@ PROFILES_FILENAME = "profiles.json"
 ACTIVE_SERVER_FILENAME = "active_server"
 # Env var naming the server to use for one invocation (beats the pointer file).
 SERVER_ENV_VAR = "HA_SERVER"
+# Separator between an item's action and the server id it belongs to.
+SERVER_TAG = "@@"
 TOKEN_SOURCE_ENV = "env"
 TOKEN_SOURCE_KEYCHAIN = "keychain"
 
@@ -506,3 +508,35 @@ def resolve_server_id(env: Mapping[str, str], data_dir: Path) -> str:
             "Use 'ha server:' to choose a server."
         )
     return server_id
+
+
+# ---------------------------------------------------------------------------
+# Server id carried on Alfred items
+# ---------------------------------------------------------------------------
+#
+# Every actionable item carries the id of the server whose cache produced
+# it, inside the ``action`` variable: ``<action>@@<server id>[::<payload>]``.
+# The action string is the one value this workflow's graph always
+# propagates, and the runner resolves config for *that* server (via
+# ``HA_SERVER``) — so an action can never land on another house, even if the
+# active server was switched in between.
+
+
+def tag_action(action: str, server_id: str) -> str:
+    """Attach *server_id* to *action* (replacing any existing tag)."""
+    head, sep, payload = action.partition("::")
+    name = head.partition(SERVER_TAG)[0]
+    return f"{name}{SERVER_TAG}{server_id}{sep}{payload}"
+
+
+def split_action(raw: str) -> tuple[str, Optional[str]]:
+    """``"toggle@@p-1a2b3c4d"`` → ``("toggle", "p-1a2b3c4d")``.
+
+    ``::<payload>`` is kept on the returned action.  Untagged actions return
+    ``None`` for the server id.
+    """
+    head, sep, payload = raw.partition("::")
+    name, tag, server_id = head.partition(SERVER_TAG)
+    if not tag:
+        return raw, None
+    return f"{name}{sep}{payload}", server_id.strip() or None

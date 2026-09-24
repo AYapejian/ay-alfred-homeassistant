@@ -30,6 +30,7 @@ for _p in (
 from ha_lib.entities import get_action_params, get_domain_config  # noqa: E402
 from ha_lib.errors import handle_error  # noqa: E402
 from ha_lib.params import parse_service_params  # noqa: E402
+from ha_lib.profiles import split_action  # noqa: E402
 from ha_workflow.alfred import AlfredIcon, AlfredItem, AlfredOutput  # noqa: E402
 
 _DEBUG = os.environ.get("HA_DEBUG", "")
@@ -57,7 +58,10 @@ def _format_param_summary(parsed: dict[str, object]) -> str:
 
 def main() -> None:
     entity_id = os.environ.get("entity_id", "").strip()
-    action = os.environ.get("action", "").strip()
+    # ``action`` may carry ``@@<server id>``: use the bare name for lookups and
+    # pass the tagged value on unchanged so the runner targets that server.
+    tagged_action = os.environ.get("action", "").strip()
+    action = split_action(tagged_action)[0]
     domain = os.environ.get("domain", "").strip()
     query = " ".join(sys.argv[1:]).strip()
 
@@ -150,7 +154,7 @@ def main() -> None:
                     arg=entity_id,
                     variables={
                         "entity_id": entity_id,
-                        "action": action,
+                        "action": tagged_action,
                         "domain": domain,
                         # Pass the raw param string; action_runner.py will parse it.
                         "params": query,
