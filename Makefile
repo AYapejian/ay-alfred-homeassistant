@@ -1,5 +1,6 @@
 .PHONY: lint format typecheck test build clean dev-install \
-	demo-ha-up demo-ha-down demo-ha-reset demo-ha-token demo-ha-status
+	demo-ha-up demo-ha-down demo-ha-reset demo-ha-token demo-ha-status \
+	screenshots screenshots-check
 
 lint:
 	uv run ruff check src/ tests/
@@ -40,3 +41,11 @@ demo-ha-token:
 
 demo-ha-status:
 	./scripts/demo-ha.sh status
+
+# Documentation screenshots — drives Alfred on screen against the demo HA
+# (see docs/images/SHOTS.md and scripts/screenshots.sh)
+screenshots:
+	./scripts/screenshots.sh
+
+screenshots-check:
+	./scripts/screenshots.sh --check
