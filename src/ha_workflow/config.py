@@ -23,7 +23,7 @@ _DEFAULT_PORTS = {"http": 80, "https": 443}
 _SERVER_KEY_LEN = 12
 # A server key names a directory under ``servers/``: no separators, no
 # leading dot/dash, bounded length.
-_SAFE_SERVER_KEY = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$")
+SAFE_SERVER_KEY = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$")
 
 
 def normalize_server_url(url: str) -> str:
@@ -140,7 +140,7 @@ class Config:
         server-profiles feature).
         """
         if self.server_key_override:
-            if not _SAFE_SERVER_KEY.match(self.server_key_override):
+            if not SAFE_SERVER_KEY.match(self.server_key_override):
                 raise ConfigError(
                     f"Invalid server key {self.server_key_override!r}: use letters, "
                     "digits, '-' or '_' (max 64)."

@@ -78,6 +78,9 @@ DOMAIN_ICONS: dict[str, tuple[str, str]] = {
     "_default": ("home-assistant", "#03A9F4"),
     # System commands icon
     "_system": ("cog", "#757575"),
+    # Server profiles (`ha server:`)
+    "_server": ("server", "#03A9F4"),
+    "_server_active": ("check-circle", "#4CAF50"),
 }
 
 

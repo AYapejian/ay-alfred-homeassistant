@@ -28,18 +28,25 @@ for _p in (
 import ha_lib.cache as _lib_cache  # noqa: E402
 import ha_lib.search as _lib_search  # noqa: E402
 import ha_lib.suggestions as _lib_suggestions  # noqa: E402
-from ha_lib.config import Config  # noqa: E402
+from ha_lib.config import Config, workflow_dirs  # noqa: E402
 from ha_lib.entities import Entity, get_domain_config  # noqa: E402
-from ha_lib.errors import handle_error  # noqa: E402
+from ha_lib.errors import ConfigError, handle_error  # noqa: E402
 from ha_lib.inference import infer_action  # noqa: E402
 from ha_lib.params import extract_param_keys, parse_service_params  # noqa: E402
+from ha_lib.profiles import load_servers, resolve_server_id  # noqa: E402
 from ha_lib.query_parser import ParsedQuery, parse_query  # noqa: E402
+from ha_lib.storage import read_server_status  # noqa: E402
 from ha_lib.usage import UsageRecord, open_usage_tracker  # noqa: E402
 from ha_workflow.alfred import (  # noqa: E402
     AlfredIcon,
     AlfredItem,
     AlfredMod,
     AlfredOutput,
+)
+from ha_workflow.server_menu import (  # noqa: E402
+    ServerRow,
+    build_server_menu,
+    parse_server_query,
 )
 
 _LOCK_FILENAME = ".refresh.lock"
@@ -256,8 +263,48 @@ def _maybe_refresh_background(config: Config) -> None:
     _dbg(f"bg_refresh: spawned pid {proc.pid}")
 
 
+def _server_menu(filter_text: str) -> AlfredOutput:
+    """``ha server:`` — built from local state only (no config, no network)."""
+    env = dict(os.environ)
+    cache_dir, data_dir = workflow_dirs(env)
+    servers = load_servers(env, data_dir)
+    try:
+        active_id = resolve_server_id(env, data_dir)
+    except ConfigError:
+        active_id = "(invalid)"
+    rows: list[ServerRow] = []
+    for prof in servers.profiles:
+        status = read_server_status(cache_dir, prof.storage_key)
+        rows.append(
+            ServerRow(
+                id=prof.id,
+                name=prof.name,
+                host=prof.host,
+                is_default=prof.is_default,
+                entity_count=status.entity_count,
+                last_refresh=status.last_refresh,
+                last_error=status.last_error,
+                last_error_at=status.last_error_at,
+            )
+        )
+    return build_server_menu(
+        rows,
+        active_id,
+        filter_text,
+        file_error=servers.file_error,
+        file_exists=servers.file_exists,
+    )
+
+
 def main() -> None:
     query = " ".join(sys.argv[1:])
+    # `server:` must work when the active server is down, uncached or
+    # misconfigured, so it is routed before config and cache.
+    server_filter = parse_server_query(query)
+    if server_filter is not None:
+        sys.stdout.write(_server_menu(server_filter).to_json() + "\n")
+        return
+
     config = Config.from_env()
     cache = _lib_cache.open_cache(config)
     tracker = open_usage_tracker(config)

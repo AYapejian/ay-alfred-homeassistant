@@ -32,14 +32,14 @@ from ha_workflow.alfred import (  # noqa: E402
     AlfredOutput,
 )
 from ha_workflow.cache import EntityCache, open_cache  # noqa: E402
-from ha_workflow.config import Config  # noqa: E402
+from ha_workflow.config import Config, workflow_dirs  # noqa: E402
 from ha_workflow.entities import (  # noqa: E402
     DomainConfig,
     Entity,
     get_action_params,
     get_domain_config,
 )
-from ha_workflow.errors import handle_error  # noqa: E402
+from ha_workflow.errors import ConfigError, handle_error  # noqa: E402
 from ha_workflow.ha_client import HAClient  # noqa: E402
 from ha_workflow.notify import (  # noqa: E402
     notify,
@@ -47,8 +47,15 @@ from ha_workflow.notify import (  # noqa: E402
     notify_error,
 )
 from ha_workflow.params import parse_service_params  # noqa: E402
+from ha_workflow.profiles import load_servers, resolve_server_id  # noqa: E402
 from ha_workflow.query_parser import ParsedQuery, parse_query  # noqa: E402
 from ha_workflow.search import fuzzy_search, regex_search  # noqa: E402
+from ha_workflow.server_menu import (  # noqa: E402
+    ServerRow,
+    build_server_menu,
+    parse_server_query,
+)
+from ha_workflow.storage import read_server_status  # noqa: E402
 from ha_workflow.suggestions import build_domain_suggestions  # noqa: E402
 from ha_workflow.usage import UsageRecord, open_usage_tracker  # noqa: E402
 
@@ -385,8 +392,47 @@ def _cmd_config_validate() -> None:
     sys.stdout.write(output.to_json() + "\n")
 
 
+def _server_menu(filter_text: str) -> AlfredOutput:
+    """``server:`` — built from local state only (no config, no network)."""
+    env = dict(os.environ)
+    cache_dir, data_dir = workflow_dirs(env)
+    servers = load_servers(env, data_dir)
+    try:
+        active_id = resolve_server_id(env, data_dir)
+    except ConfigError:
+        active_id = "(invalid)"
+    rows: list[ServerRow] = []
+    for prof in servers.profiles:
+        status = read_server_status(cache_dir, prof.storage_key)
+        rows.append(
+            ServerRow(
+                id=prof.id,
+                name=prof.name,
+                host=prof.host,
+                is_default=prof.is_default,
+                entity_count=status.entity_count,
+                last_refresh=status.last_refresh,
+                last_error=status.last_error,
+                last_error_at=status.last_error_at,
+            )
+        )
+    return build_server_menu(
+        rows,
+        active_id,
+        filter_text,
+        file_error=servers.file_error,
+        file_exists=servers.file_exists,
+    )
+
+
 def _cmd_search(query: str) -> None:
     """Search cached entities and return Alfred JSON results."""
+    # `server:` is routed before config and cache (see search_filter.py).
+    server_filter = parse_server_query(query)
+    if server_filter is not None:
+        sys.stdout.write(_server_menu(server_filter).to_json() + "\n")
+        return
+
     config = Config.from_env()
     cache = open_cache(config)
     tracker = open_usage_tracker(config)
