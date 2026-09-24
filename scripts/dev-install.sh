@@ -40,14 +40,22 @@ if [ ! -d "${ALFRED_PREFS_DIR}" ]; then
 fi
 
 # --- Step 1: Symlink ha_workflow source into workflow/ for dev ---
+# Relative so the link survives the repo being moved.
 HA_SRC_LINK="${WORKFLOW_DIR}/ha_workflow"
+HA_SRC_TARGET="../src/ha_workflow"
 if [ -L "${HA_SRC_LINK}" ]; then
-  echo "Source symlink exists: ${HA_SRC_LINK}"
+  if [ "$(readlink "${HA_SRC_LINK}")" = "${HA_SRC_TARGET}" ]; then
+    echo "Source symlink exists: workflow/ha_workflow -> ${HA_SRC_TARGET}"
+  else
+    rm "${HA_SRC_LINK}"
+    ln -s "${HA_SRC_TARGET}" "${HA_SRC_LINK}"
+    echo "Replaced source symlink: workflow/ha_workflow -> ${HA_SRC_TARGET}"
+  fi
 elif [ -d "${HA_SRC_LINK}" ]; then
   echo "Warning: ${HA_SRC_LINK} is a real directory, skipping symlink."
 else
-  ln -s "${REPO_ROOT}/src/ha_workflow" "${HA_SRC_LINK}"
-  echo "Created source symlink: workflow/ha_workflow -> ../src/ha_workflow"
+  ln -s "${HA_SRC_TARGET}" "${HA_SRC_LINK}"
+  echo "Created source symlink: workflow/ha_workflow -> ${HA_SRC_TARGET}"
 fi
 
 # --- Step 2: Symlink workflow/ into Alfred's preferences ---

@@ -37,12 +37,28 @@ Several Phase 4 tasks were partially or fully addressed in earlier phases:
 - Connection failure: diagnostic info (URL, timeout, auth error distinction)
 - Config check accessible via system command (Phase 3.4 may cover this)
 
-### 4.4 — Documentation
+### 4.4 — Entity item ux improvements
+- [ ] **Pending** Entities should...
+- [ ] If state is open/closed, on/off, locked/unlocked, motion,no-motion (cleared)... These type of entities should have a visibly informative way to display the different states.
+- [ ] If entities are unavailable they should be visually distinct (e.g. grayed out, "unavailable" subtitle), font smaller and italicized, default action will be opening submenu
+- [ ] If entities are sensors then display the state and unit of measurement in the subtitle, and the default action will be opening the submenu
+- [ ] If entities are media players then display the source in the subtitle, and the default will be play/pause toggle
+- [ ] If entities are lights then display the brightness in subtitle.  Also render the light color temp or color in the subtitle line as a rectangular box. Default action will be toggle on/off
+- [ ] ( Continue adding to this list and think as if you were the end user and what would be the most useful information to display for each type of entity, and what would be the most useful default action for each type of entity. )
+
+
+### 4.5 — User onboarding and workflow preference ha system commands
 - [ ] **Pending**
+- [ ] System commands to fill in workflow configuration. Only required should be auto prompted on first install for HA url and API key, if auth fails then prompt user to re-enter credentials, and provide diagnostic info on what went wrong (e.g. timeout, auth error, etc).
+- [ ] System command to check HA connection and config validity, with diagnostic info on failure
+- [ ] System command to reset workflow configuration (clear saved url and API key)
+- [ ] system command to open workflow documentation (README)
+
+
+### 4.6 — Documentation
+- [ ] **Pending** Check all documentation is up to date with the latest features and changes, and is clear and comprehensive for new users.
 - README: installation, configuration, usage, supported entities, action reference, troubleshooting
 - Search syntax reference: plain text, `domain:text`, `/regex/`, system commands
-
----
 
 ## Removed Tasks
 
