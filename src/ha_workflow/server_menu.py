@@ -134,6 +134,83 @@ def _row_item(row: ServerRow, active: bool, now: float) -> AlfredItem:
     )
 
 
+def build_server_actions_menu(row: Optional[ServerRow], active: bool) -> AlfredOutput:
+    """The ⌘ sub-menu for one server (shown by the actions Script Filter)."""
+    if row is None:
+        return AlfredOutput(
+            items=[
+                AlfredItem(
+                    title="Server not found",
+                    subtitle="It may have been removed — go back to 'ha server:'",
+                    icon=_WARN_ICON,
+                    valid=False,
+                )
+            ]
+        )
+
+    def action_item(title: str, subtitle: str, verb: str) -> AlfredItem:
+        variables = _variables(server_action(verb, row.id))
+        variables.update({"params": "", "param_mode": ""})
+        return AlfredItem(
+            title=title,
+            subtitle=subtitle,
+            arg=row.id,
+            icon=SERVER_ICON,
+            variables=variables,
+            valid=True,
+        )
+
+    state = "active" if active else "not active"
+    items = [
+        AlfredItem(
+            title=row.name,
+            subtitle=f"{row.host} · {state}",
+            icon=ACTIVE_ICON if active else SERVER_ICON,
+            valid=False,
+        )
+    ]
+    if not active:
+        items.append(
+            action_item(
+                f"Switch to {row.name}",
+                "Make this the server Alfred searches and controls",
+                "switch",
+            )
+        )
+    items.append(
+        action_item(
+            "Test connection",
+            "Reports the Home Assistant version, or the error",
+            "test",
+        )
+    )
+    if row.is_default:
+        items.append(
+            AlfredItem(
+                title="Default server",
+                subtitle="URL and token: Alfred → Workflows → Configure",
+                icon=_WARN_ICON,
+                valid=False,
+            )
+        )
+    else:
+        items.append(
+            action_item(
+                "Re-enter token…",
+                "Hidden dialog; the token is stored in the macOS Keychain",
+                "token",
+            )
+        )
+        items.append(
+            action_item(
+                "Remove server…",
+                "Asks first. Deletes its token, cached entities and usage history",
+                "remove",
+            )
+        )
+    return AlfredOutput(items=items)
+
+
 def build_server_menu(
     rows: Sequence[ServerRow],
     active_id: str,

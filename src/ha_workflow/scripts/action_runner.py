@@ -37,9 +37,37 @@ from ha_lib.config import Config  # noqa: E402
 from ha_lib.errors import handle_error  # noqa: E402
 from ha_lib.notify import notify, notify_error  # noqa: E402
 from ha_lib.params import parse_service_params  # noqa: E402
+from ha_lib.server_actions import (  # noqa: E402
+    ServerActionContext,
+    run_server_action,
+)
 from ha_lib.usage import open_usage_tracker  # noqa: E402
 
 _SYSTEM_ENTITY = "__system__"
+_SERVER_ENTITY = "__server__"
+
+
+def _spawn_refresh(config: Config) -> None:
+    """Background cache refresh for *config*'s server (shared with search)."""
+    from ha_workflow.scripts.search_filter import _maybe_refresh_background
+
+    _maybe_refresh_background(config)
+
+
+def _server_context() -> ServerActionContext:
+    """Real dependencies for server actions: dialogs, Keychain, HTTP."""
+    from ha_lib.keychain import SecurityCliTokenStore
+    from ha_lib.prompter import OsascriptPrompter
+
+    return ServerActionContext(
+        env=dict(os.environ),
+        prompter=OsascriptPrompter(),
+        token_store=SecurityCliTokenStore(),
+        client_factory=lambda cfg, timeout: HAClient(cfg, timeout=timeout),
+        spawn_refresh=_spawn_refresh,
+    )
+
+
 _YAML_SPECIAL_CHARS = frozenset(":#[]{},&*!|>")
 
 
@@ -301,6 +329,10 @@ def main() -> None:
     domain = os.environ.get("domain", "").strip()
     # Phase D: params come cleanly via Alfred variable — no ::encoding hack
     raw_params = os.environ.get("params", "").strip()
+
+    if entity_id == _SERVER_ENTITY:
+        notify(run_server_action(action, _server_context()))
+        return
 
     if entity_id == _SYSTEM_ENTITY:
         config = Config.from_env()

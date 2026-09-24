@@ -28,10 +28,16 @@ for _p in (
         sys.path.insert(0, _p)
 
 from ha_lib.cache import open_cache  # noqa: E402
-from ha_lib.config import Config  # noqa: E402
+from ha_lib.config import Config, workflow_dirs  # noqa: E402
 from ha_lib.entities import Entity, get_action_params, get_domain_config  # noqa: E402
-from ha_lib.errors import handle_error  # noqa: E402
+from ha_lib.errors import ConfigError, handle_error  # noqa: E402
+from ha_lib.profiles import load_servers, resolve_server_id  # noqa: E402
 from ha_workflow.alfred import AlfredIcon, AlfredItem, AlfredOutput  # noqa: E402
+from ha_workflow.server_menu import (  # noqa: E402
+    SERVER_ENTITY,
+    ServerRow,
+    build_server_actions_menu,
+)
 
 _SYSTEM_ICON = AlfredIcon(path="icons/_system.png")
 _DEBUG = os.environ.get("HA_DEBUG", "")
@@ -75,9 +81,40 @@ def _get_cached_entity(config: Config, entity_id: str) -> Optional[Entity]:
         cache.close()
 
 
+def _server_actions(action: str) -> AlfredOutput:
+    """⌘ on a ``server:`` item: that server's sub-menu (``server_menu::<id>``)."""
+    _, _, server_id = action.partition("::")
+    env = dict(os.environ)
+    _, data_dir = workflow_dirs(env)
+    servers = load_servers(env, data_dir)
+    profile = servers.get(server_id.strip())
+    try:
+        active_id = resolve_server_id(env, data_dir)
+    except ConfigError:
+        active_id = ""
+    row = (
+        ServerRow(
+            id=profile.id,
+            name=profile.name,
+            host=profile.host,
+            is_default=profile.is_default,
+        )
+        if profile
+        else None
+    )
+    return build_server_actions_menu(
+        row, active=bool(profile) and active_id == server_id
+    )
+
+
 def main() -> None:
     entity_id = os.environ.get("entity_id", "").strip()
     domain = os.environ.get("domain", "").strip()
+
+    if entity_id == SERVER_ENTITY:
+        action = os.environ.get("action", "").strip()
+        sys.stdout.write(_server_actions(action).to_json() + "\n")
+        return
 
     if not entity_id:
         output = AlfredOutput(

@@ -10,6 +10,7 @@ FIXTURES_DIR = Path(__file__).parent / "fixtures"
 # Where the Keychain token store looks for `security` during tests: a path
 # that cannot exist, so no test can ever read or write the real Keychain.
 _DISABLED_SECURITY_BIN = "/nonexistent/security-disabled-in-tests"
+_DISABLED_OSASCRIPT_BIN = "/nonexistent/osascript-disabled-in-tests"
 
 
 @pytest.fixture()
@@ -31,10 +32,13 @@ def _no_real_keychain(
       ``active_server`` in it — is never read.
     """
     import ha_lib.keychain
+    import ha_lib.prompter
     import ha_workflow.keychain
 
     for mod in (ha_lib.keychain, ha_workflow.keychain):
         monkeypatch.setattr(mod, "SECURITY_BIN", _DISABLED_SECURITY_BIN)
+    # No test may pop a real dialog either.
+    monkeypatch.setattr(ha_lib.prompter, "OSASCRIPT_BIN", _DISABLED_OSASCRIPT_BIN)
     for var in ("HA_SERVER", "alfred_workflow_cache", "alfred_workflow_data"):
         monkeypatch.delenv(var, raising=False)
     monkeypatch.setenv("HOME", str(tmp_path_factory.mktemp("home")))
