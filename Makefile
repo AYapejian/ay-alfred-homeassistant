@@ -1,4 +1,5 @@
-.PHONY: lint format typecheck test build clean dev-install
+.PHONY: lint format typecheck test build clean dev-install \
+	demo-ha-up demo-ha-down demo-ha-reset demo-ha-token demo-ha-status
 
 lint:
 	uv run ruff check src/ tests/
@@ -23,3 +24,19 @@ dev-install:
 
 clean:
 	rm -rf dist/
+
+# Throwaway demo Home Assistant on 127.0.0.1:8124 (see demo/README.md)
+demo-ha-up:
+	./scripts/demo-ha.sh up
+
+demo-ha-down:
+	./scripts/demo-ha.sh down
+
+demo-ha-reset:
+	./scripts/demo-ha.sh reset
+
+demo-ha-token:
+	./scripts/demo-ha.sh token
+
+demo-ha-status:
+	./scripts/demo-ha.sh status

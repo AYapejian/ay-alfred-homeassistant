@@ -1,0 +1,57 @@
+# Demo Home Assistant — fake devices only, safe for public screenshots.
+# Everything else in this directory is runtime state (gitignored) and is
+# wiped by `scripts/demo-ha.sh reset`.
+
+homeassistant:
+  name: "Demo Home"
+  # Fictional location (the example coordinates from the HA docs).
+  latitude: 32.87336
+  longitude: -117.22743
+  elevation: 0
+  unit_system: metric
+  time_zone: "UTC"
+  currency: "USD"
+  country: "US"
+
+# Frontend, config panels, person, onboarding, etc.
+default_config:
+
+# The built-in demo integration: fake lights, switches, locks, covers,
+# climate, media players, sensors, vacuums, and more.
+demo:
+
+logger:
+  default: warning
+
+# A couple of harmless automations and a script so the workflow's
+# automation/script actions have something to act on (demo: creates none).
+automation:
+  - id: demo_porch_light_at_sunset
+    alias: "Porch light at sunset"
+    triggers:
+      - trigger: sun
+        event: sunset
+    actions:
+      - action: light.turn_on
+        target:
+          entity_id: light.ceiling_lights
+  - id: demo_all_off_at_midnight
+    alias: "All lights off at midnight"
+    triggers:
+      - trigger: time
+        at: "00:00:00"
+    actions:
+      - action: light.turn_off
+        target:
+          entity_id: all
+
+script:
+  demo_movie_time:
+    alias: "Movie time"
+    sequence:
+      - action: light.turn_off
+        target:
+          entity_id: light.ceiling_lights
+      - action: media_player.media_play
+        target:
+          entity_id: media_player.living_room
