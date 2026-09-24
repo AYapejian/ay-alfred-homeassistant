@@ -67,6 +67,32 @@ uv run python scripts/qa_smoke_test.py --write
 | System: Check config | "Configuration is valid" or "Config invalid: {errors}" |
 | System: View error log | "Error log copied to clipboard (N lines): {first line}" |
 
+### Server profiles (`ha server:`) — manual, on a real Mac
+
+These cannot be covered by automated tests (real dialogs, the real Keychain, Alfred's variable propagation). Use the demo HA (`make demo-ha-up`) as the second server.
+
+| Check | Expected |
+|-------|----------|
+| `ha server:` with only the default configured | `✓ Default` + `Add server…` |
+| **Add server…** → name / URL / token dialogs | Each dialog comes to the front; the token field shows bullets; Cancel at any step adds nothing |
+| First Keychain write and read | No Keychain access prompt (the item is created and read by `/usr/bin/security`) |
+| Keychain Access → search `com.ayapejian.alfred-homeassistant` | One item per added server, account = its `p-…` id |
+| `ps aux \| grep security` while adding | Only `security -i` is visible, never the token |
+| Wrong token → **Save anyway** / **Cancel** | Cancel is the default button; Cancel adds nothing |
+| Enter on the new server | Notification `Switched to <name> (HA <version>)`; `ha` shows its entities |
+| With 2 servers: entity subtitles | Start with the server badge/name |
+| With 2 servers: `ha system` | All five titles end with `(<server name>)` |
+| Enter on an entity of the added server | Notification starts `<name>:`; the state changes on that server, not the default (the `action@@<id>` variable reached the Run Script) |
+| ⌘ Enter on that entity → **Turn On** → Set parameters `brightness:50%` → Enter | Lands on the same server (the tag survives the actions and params Script Filters) |
+| Open `ha light`, then in a second Alfred window switch servers, then press Enter on the first window's result | The action lands on the server the result was listed from |
+| ⌘ Enter on a server → **Test connection** | `<name>: connected · HA <version>` |
+| ⌘ Enter → **Re-enter token…** | Hidden dialog; `Token updated for <name>` |
+| ⌘ Enter → **Remove server…** | Dialog says cache and usage history are deleted, Cancel is default; after Remove the Keychain item and `servers/p-…/` dirs are gone |
+| Remove the *active* server, then `ha light` | Error pointing to `ha server:` — no silent fallback |
+| ⌥ / ⌃ Enter on a server item | Not actionable (subtitle points to ⌘) |
+| **Edit servers file…** | `profiles.json` opens in the default text editor; no tokens in it |
+| Break `profiles.json` (invalid JSON) | `ha server:` shows `Servers file is invalid: …` first, default still listed and switchable |
+
 ### Viewers (from sub-menu)
 
 | Action | Expected |

@@ -31,6 +31,7 @@ This is a native macOS Alfred workflow — not a Home Assistant add-on. It runs 
 - System commands (cache refresh, clear usage data) accessible from search
 - Cached entity index in SQLite for fast, offline-capable lookups
 - Per-server storage — the entity cache and usage history are kept separately for each `HA_URL`, so pointing the workflow at another Home Assistant never mixes or clears the first one's data (existing data moves into the current server's folder on upgrade)
+- Several servers — add more Home Assistant instances and switch between them with `ha server:`; tokens for added servers live in the macOS Keychain
 
 **Planned:**
 
@@ -62,6 +63,38 @@ This is a native macOS Alfred workflow — not a Home Assistant add-on. It runs 
 ### Promoting entities to the top
 
 Create a label in Home Assistant (Settings → Areas & zones → Labels) named **Alfred Preferred** — HA stores it with the slug `alfred_preferred`. Tag any entity *or device* with it and those entities float above unlabeled ones in search results. Device-level labels propagate to every entity on that device. Your own usage history still takes priority over labeled entities. Override the slug with `HA_PREFERRED_LABEL` if you prefer a different label name.
+
+### Several Home Assistant servers
+
+The server in the workflow configuration (`HA_URL` / `HA_TOKEN`) is the **default** server; nothing changes if it is the only one. To add another (a second house, a demo instance):
+
+1. Type `ha server:` and choose **Add server…**
+2. Enter a name, the URL, and a long-lived access token. The token field is hidden, and the token is stored in your login Keychain (service `com.ayapejian.alfred-homeassistant`), not in Alfred's preferences.
+3. The workflow checks the token with the server once. If the server is offline you can **Save anyway**.
+
+Adding a server does not switch to it. In `ha server:`:
+
+| Key | On a server |
+|-----|-------------|
+| **Enter** | Switch to it. Search and actions now use this server. |
+| **⌘ Enter** | Server actions: switch, test connection, re-enter token, remove |
+
+- `ha server:<text>` filters the list by name or host. The active server has a ✓ and shows its entity count and last refresh. A server whose last background refresh failed says so.
+- **Remove server…** asks first. It deletes that server's token, cached entities and usage history on this Mac. The default server can only be changed in the workflow configuration.
+- **Edit servers file…** opens `profiles.json` in Alfred's workflow data folder. It holds names, URLs, an optional `badge` (a short label such as `LAKE`) and an optional `preferred_label` per server, and never tokens. A `"default": {"name": "Home", "badge": "🏠"}` entry renames the default server.
+
+**Which server an action hits.** Each result remembers the server it came from. Enter always acts on that server, even if you switched in between. With more than one server configured:
+
+- every entity subtitle starts with the server's badge or name (`Lake House · Kitchen · on`)
+- system commands name the server: `System: Restart Home Assistant (Lake House)`
+- notifications start with the server name: `Lake House: Toggled Front Door`
+
+**Things to know**
+
+- Added servers and their tokens stay on this Mac. They do not follow Alfred's preference sync; on a second Mac, add them again.
+- There is no automatic switch back to the default server.
+- Changing `HA_URL` itself still starts a fresh cache and usage history, because it is a different server. Editing an added server's URL in `profiles.json` keeps its history.
+- If the active server is removed, or `profiles.json` cannot be read, `ha` shows an error that points to `ha server:`. It never falls back to another server on its own.
 
 ## Development
 

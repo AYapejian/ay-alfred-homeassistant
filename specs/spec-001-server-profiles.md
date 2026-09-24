@@ -1,6 +1,6 @@
 # Spec 001 — Server profiles
 
-**Status:** Draft, for review. Design only; no code yet.
+**Status:** Implemented on `feat/47-server-profiles`, awaiting review. Section 6 lists the owner-overridable decisions and where the code departs from this design.
 **Date:** 2026-09-24
 **Depends on:** #46, "Isolate cache and usage storage per HA server": the `Config.server_key` seam plus per-server dirs.
 **Related:** #30, "Support both local and cloud HA URLs with automatic fallback".
@@ -269,3 +269,16 @@ With exactly one profile, nothing changes, so single-server users see no extra t
 - **Q3 — Auto-revert.** Should a non-default active server revert to the default after some idle period (e.g. 12 h)? It's a guard against "still pointed at the lake house a week later". Default in this spec: no.
 - **Q4 — Confirm risky actions.** With more than one server configured, should lock, cover and alarm actions ask for confirmation that names the server? Default in this spec: no. The subtitle prefix is the guard.
 - **Q5 — What Remove deletes.** Should removing a server delete its usage history, or keep it so re-adding the server restores the rankings? Default in this spec: delete, with the confirmation dialog saying so.
+
+## 6. Implementation notes (2026-09-24)
+
+**Open questions — adopted as the spec's defaults, overridable by the owner:** Q1 hybrid; Q2 profiles are per-Mac; Q3 no auto-revert; Q4 no extra confirmation for locks, covers or alarms (the server name in subtitles and notifications is the guard); Q5 Remove deletes that server's storage, and the dialog says so.
+
+**Where the code differs from sections 3.3–3.7:**
+
+- **Server-item modifiers.** `info.plist` routes a modifier by *connection*: ⌘ goes to the actions Script Filter, ⌥ to the copy-entity script, ⌃ to the open-in-HA script. So ⌘ on a server item opens a server sub-menu (switch, test connection, re-enter token, remove) in the existing actions Script Filter, matching the project's "Cmd = sub-menu" convention. ⌥ and ⌃ on server items are not actionable. No `info.plist` change was needed.
+- **Token check.** It uses `GET /api/config` rather than `GET /api/`: one call validates the token and returns the version for the notification.
+- **Default server display.** An optional `"default": {"name": …, "badge": …}` entry in `profiles.json` renames the default server. Without it, the default server is called "Default".
+- **Removing the active server.** The pointer is left as it is, so the next `ha` fails closed with an error pointing to `ha server:`. The Remove notification says so.
+- **Server id on items.** The id travels in the `action` variable as `<action>@@<id>[::<payload>]`. The ⌘ modifier on entity items carries `@@<id>` alone, so the actions and params Script Filters read the right cache and keep the tag. An on-device check that the tag propagates is in `scripts/QA_CHEATSHEET.md`.
+- **Additions.** With more than one server, an empty query lists a `Server: <name>` hint that autocompletes to `server:`. A `profiles.json` that fails to parse counts toward `server_count`, so the wrong-house signals stay on. Legacy flat files only ever migrate into the default server. Configuration errors in the action runner now show as plain notification text instead of Script Filter JSON.
