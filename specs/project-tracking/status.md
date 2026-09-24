@@ -31,6 +31,7 @@
 | 2026-03-21 | **No `uid` on entity items** | Prevents Alfred's built-in learning from overriding our usage-based ranking. Our fuzzy search + usage boost has full control over ordering. |
 | 2026-03-21 | **System commands via search** | System actions (cache refresh, usage clear) surface as search results with `__system__` entity_id, distinct icon, and "System" subtitle. Dispatched through `_cmd_action` → `_cmd_system_action`. |
 | 2026-04-21 | **Preferred-label tiering (not weight)** | Search results are grouped into explicit tiers: usage history → labeled (`HA_PREFERRED_LABEL`, default `alfred_preferred`) → everything else. Device-level labels propagate to child entities; area labels do not. Keeps the "usage wins" contract explicit instead of tuning weights. |
+| 2026-09-24 | **Per-server storage keyed by normalized URL hash** | Entity cache, usage history, and refresh state live under `servers/<key>/` in Alfred's cache/data dirs, where `<key>` is a 12-char sha256 of the normalized `HA_URL`. Switching servers can never mix or clear another server's data; `Config.server_key` is the single seam a server-profiles feature can override. Legacy flat files migrate once into the server configured at upgrade. |
 
 ---
 
@@ -43,6 +44,7 @@
 | 2 | Entity Cache & Search | **Done** | `feat/phase-2-cache-search` | `1a48cc8` on main |
 | 1.5 | Enhanced Search | **Done** | `feat/phase-1.5-enhanced-search` | `bae99ed` on main |
 | 1.6 | Preferred-label prioritization | **Done** | `feat/38-preferred-label` | `80df1c5` on main |
+| 1.7 | Multi-server support | **In progress** | `feat/46-per-server-storage` | — |
 | 3 | Actions & Entity Interaction | **Next** | — | — |
 | 4 | Polish & Usability | Planned | — | — |
 | 5 | WebSocket Listener | Deferred | — | — |
