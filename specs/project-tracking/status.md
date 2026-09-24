@@ -1,7 +1,7 @@
 # Project Status
 
 **Project:** ay-alfred-homeassistant
-**Last updated:** 2026-04-21
+**Last updated:** 2026-09-24
 
 ---
 
@@ -9,10 +9,10 @@
 
 | Item | Value |
 |------|-------|
-| **Current phase** | Phase 1.6 — Preferred-label prioritization (in progress) / Phase 3 queued |
-| **Active branch** | `feat/38-preferred-label` |
-| **Last completed phase** | Phase 1.5 — Enhanced Search |
-| **Last commit on main** | `bae99ed` — Phase 1.5 merged |
+| **Current phase** | None active — see Phase Overview |
+| **Active branch** | — |
+| **Last completed phase** | Phase 1.6 — Preferred-label prioritization |
+| **Last commit on main** | `e19a291` — dev-install symlink fix (#41) |
 | **Blockers** | None |
 
 ---
@@ -42,7 +42,7 @@
 | 1 | Configuration & HA Client | **Done** | `feat/phase-1-config-ha-client` | `48462ac` on main |
 | 2 | Entity Cache & Search | **Done** | `feat/phase-2-cache-search` | `1a48cc8` on main |
 | 1.5 | Enhanced Search | **Done** | `feat/phase-1.5-enhanced-search` | `bae99ed` on main |
-| 1.6 | Preferred-label prioritization | **In progress** | `feat/38-preferred-label` | — |
+| 1.6 | Preferred-label prioritization | **Done** | `feat/38-preferred-label` | `80df1c5` on main |
 | 3 | Actions & Entity Interaction | **Next** | — | — |
 | 4 | Polish & Usability | Planned | — | — |
 | 5 | WebSocket Listener | Deferred | — | — |

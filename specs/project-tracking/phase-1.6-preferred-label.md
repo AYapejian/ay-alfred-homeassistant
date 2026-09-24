@@ -1,7 +1,7 @@
 # Phase 1.6: Preferred-Label Prioritization
 
 **Goal:** Let users tag entities (or devices) in Home Assistant with a label so those entities float above unlabeled ones in Alfred search results, without disturbing usage-history-based ranking.
-**Status:** In progress
+**Status:** Done — merged as `80df1c5` (#39)
 **Branch:** `feat/38-preferred-label`
 **Issue:** [#38](https://github.com/AYapejian/ay-alfred-homeassistant/issues/38)
 **Depends on:** Phase 1.5
@@ -59,7 +59,7 @@
 - README: documented the label + override under the "Promoting entities to the top" section
 
 ### 1.6.9 — Merge & changelog
-- [ ] Pending — open PR with `Closes #38`, address review, squash-merge, then log in `changelog.md` and flip phase status to Done in `status.md`
+- [x] **Done** — 2026-09-23 · squash-merged as `80df1c5` (#39); changelog and `status.md` updated in #42
 
 ---
 
