@@ -454,7 +454,7 @@ class TestCacheCommand:
         capsys: object,
     ) -> None:
         config = MagicMock()
-        config.cache_dir = Path("/tmp/test-cache")
+        config.server_cache_dir = Path("/tmp/test-cache")
         mock_from_env.return_value = config
         cache = _mock_cache()
         mock_open_cache.return_value = cache
@@ -526,7 +526,7 @@ class TestBackgroundRefresh:
 
         mock_popen.return_value = MagicMock(pid=12345)
         config = MagicMock()
-        config.cache_dir = tmp_path
+        config.server_cache_dir = tmp_path
 
         _maybe_refresh_background(config)
 
@@ -549,7 +549,7 @@ class TestBackgroundRefresh:
         mock_kill.return_value = None  # signal 0 succeeds = process alive
 
         config = MagicMock()
-        config.cache_dir = tmp_path
+        config.server_cache_dir = tmp_path
 
         _maybe_refresh_background(config)
 
@@ -573,7 +573,7 @@ class TestBackgroundRefresh:
         mock_popen.return_value = MagicMock(pid=54321)
 
         config = MagicMock()
-        config.cache_dir = tmp_path
+        config.server_cache_dir = tmp_path
 
         _maybe_refresh_background(config)
 

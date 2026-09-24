@@ -30,6 +30,7 @@ This is a native macOS Alfred workflow — not a Home Assistant add-on. It runs 
 - HA system commands — restart, check config, view error log
 - System commands (cache refresh, clear usage data) accessible from search
 - Cached entity index in SQLite for fast, offline-capable lookups
+- Per-server storage — the entity cache and usage history are kept separately for each `HA_URL`, so pointing the workflow at another Home Assistant never mixes or clears the first one's data (existing data moves into the current server's folder on upgrade)
 
 **Planned:**
 

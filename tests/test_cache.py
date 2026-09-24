@@ -267,7 +267,7 @@ class TestOpenCache:
             data_dir=tmp_path / "data",
         )
         cache = open_cache(config)
-        db_file = tmp_path / "cache" / "entities.db"
+        db_file = config.server_cache_dir / "entities.db"
         assert db_file.exists()
         cache.close()
 
