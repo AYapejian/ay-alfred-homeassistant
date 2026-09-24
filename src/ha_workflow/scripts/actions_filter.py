@@ -28,10 +28,22 @@ for _p in (
         sys.path.insert(0, _p)
 
 from ha_lib.cache import open_cache  # noqa: E402
-from ha_lib.config import Config  # noqa: E402
+from ha_lib.config import Config, workflow_dirs  # noqa: E402
 from ha_lib.entities import Entity, get_action_params, get_domain_config  # noqa: E402
-from ha_lib.errors import handle_error  # noqa: E402
+from ha_lib.errors import ConfigError, handle_error  # noqa: E402
+from ha_lib.profiles import (  # noqa: E402
+    SERVER_ENV_VAR,
+    load_servers,
+    resolve_server_id,
+    split_action,
+    tag_action,
+)
 from ha_workflow.alfred import AlfredIcon, AlfredItem, AlfredOutput  # noqa: E402
+from ha_workflow.server_menu import (  # noqa: E402
+    SERVER_ENTITY,
+    ServerRow,
+    build_server_actions_menu,
+)
 
 _SYSTEM_ICON = AlfredIcon(path="icons/_system.png")
 _DEBUG = os.environ.get("HA_DEBUG", "")
@@ -75,9 +87,40 @@ def _get_cached_entity(config: Config, entity_id: str) -> Optional[Entity]:
         cache.close()
 
 
+def _server_actions(action: str) -> AlfredOutput:
+    """⌘ on a ``server:`` item: that server's sub-menu (``server_menu::<id>``)."""
+    _, _, server_id = action.partition("::")
+    env = dict(os.environ)
+    _, data_dir = workflow_dirs(env)
+    servers = load_servers(env, data_dir)
+    profile = servers.get(server_id.strip())
+    try:
+        active_id = resolve_server_id(env, data_dir)
+    except ConfigError:
+        active_id = ""
+    row = (
+        ServerRow(
+            id=profile.id,
+            name=profile.name,
+            host=profile.host,
+            is_default=profile.is_default,
+        )
+        if profile
+        else None
+    )
+    return build_server_actions_menu(
+        row, active=bool(profile) and active_id == server_id
+    )
+
+
 def main() -> None:
     entity_id = os.environ.get("entity_id", "").strip()
     domain = os.environ.get("domain", "").strip()
+
+    if entity_id == SERVER_ENTITY:
+        action = os.environ.get("action", "").strip()
+        sys.stdout.write(_server_actions(action).to_json() + "\n")
+        return
 
     if not entity_id:
         output = AlfredOutput(
@@ -103,8 +146,16 @@ def main() -> None:
 
     dc = get_domain_config(domain)
 
+    # The search item says which server it came from (``@@<server id>``):
+    # read that server's cache and tag every action with it.
+    _, server_id = split_action(os.environ.get("action", "").strip())
+    env = dict(os.environ)
+    if server_id:
+        env[SERVER_ENV_VAR] = server_id
+
+    config: Optional[Config] = None
     try:
-        config = Config.from_env()
+        config = Config.from_env(env)
         entity = _get_cached_entity(config, entity_id)
     except Exception:
         entity = None
@@ -125,6 +176,8 @@ def main() -> None:
     relative = _format_relative_time(last_changed)
     if relative:
         header_subtitle += f" \u00b7 Changed {relative}"
+    if config is not None and config.is_multi_server:
+        header_subtitle = f"{config.server_prefix} \u00b7 {header_subtitle}"
     items.append(
         AlfredItem(
             title=friendly,
@@ -299,6 +352,13 @@ def main() -> None:
             valid=True,
         )
     )
+
+    if server_id:
+        for item in items:
+            if item.variables and "action" in item.variables:
+                item.variables["action"] = tag_action(
+                    item.variables["action"], server_id
+                )
 
     output = AlfredOutput(items=items)
     sys.stdout.write(output.to_json() + "\n")

@@ -34,13 +34,66 @@ from ha_lib.actions import dispatch_action  # noqa: E402
 from ha_lib.cache import open_cache  # noqa: E402
 from ha_lib.client import HAClient  # noqa: E402
 from ha_lib.config import Config  # noqa: E402
-from ha_lib.errors import handle_error  # noqa: E402
+from ha_lib.errors import HAWorkflowError, handle_error  # noqa: E402
 from ha_lib.notify import notify, notify_error  # noqa: E402
 from ha_lib.params import parse_service_params  # noqa: E402
+from ha_lib.profiles import SERVER_ENV_VAR, split_action  # noqa: E402
+from ha_lib.server_actions import (  # noqa: E402
+    ServerActionContext,
+    run_server_action,
+)
 from ha_lib.usage import open_usage_tracker  # noqa: E402
 
 _SYSTEM_ENTITY = "__system__"
+_SERVER_ENTITY = "__server__"
+
+
+def _spawn_refresh(config: Config) -> None:
+    """Background cache refresh for *config*'s server (shared with search)."""
+    from ha_workflow.scripts.search_filter import _maybe_refresh_background
+
+    _maybe_refresh_background(config)
+
+
+def _server_context() -> ServerActionContext:
+    """Real dependencies for server actions: dialogs, Keychain, HTTP."""
+    from ha_lib.keychain import SecurityCliTokenStore
+    from ha_lib.prompter import OsascriptPrompter
+
+    return ServerActionContext(
+        env=dict(os.environ),
+        prompter=OsascriptPrompter(),
+        token_store=SecurityCliTokenStore(),
+        client_factory=lambda cfg, timeout: HAClient(cfg, timeout=timeout),
+        spawn_refresh=_spawn_refresh,
+    )
+
+
 _YAML_SPECIAL_CHARS = frozenset(":#[]{},&*!|>")
+
+
+# "Lake House: " when several servers are configured, else "" — set once
+# the target server is known (see _set_notify_prefix).
+_notify_prefix: list[str] = [""]
+
+
+def _notify(message: str) -> None:
+    notify(_notify_prefix[0] + message)
+
+
+def _notify_error(message: str) -> None:
+    notify_error(_notify_prefix[0] + message)
+
+
+def _set_notify_prefix() -> None:
+    """Name the target server in notifications when there is more than one."""
+    _notify_prefix[0] = ""
+    try:
+        config = Config.from_env()
+    except HAWorkflowError:
+        return  # the action itself will report the configuration problem
+    if config.is_multi_server:
+        _notify_prefix[0] = f"{config.server_display_name}: "
 
 
 def _record_usage(config: Config, entity_id: str) -> None:
@@ -134,24 +187,24 @@ def _cmd_copy(config: Config, entity_id: str, action: str) -> None:
     elif action == "copy_device_details":
         device_id = _lookup_device_id(client, entity_id)
         if not device_id:
-            notify_error(f"No device found for {entity_id}")
+            _notify_error(f"No device found for {entity_id}")
             return
         device = _lookup_device(client, device_id)
         if not device:
-            notify_error(f"Device {device_id} not found")
+            _notify_error(f"Device {device_id} not found")
             return
         text = _format_as_yaml(device)
         msg = f"Copied device details for {entity_id}"
     else:
-        notify_error(f"Unknown copy action: {action}")
+        _notify_error(f"Unknown copy action: {action}")
         return
 
     try:
         subprocess.run(["pbcopy"], input=text.encode("utf-8"), check=True)
     except Exception as exc:
-        notify_error(f"Failed to copy to clipboard: {exc}")
+        _notify_error(f"Failed to copy to clipboard: {exc}")
         return
-    notify(msg)
+    _notify(msg)
 
 
 def _cmd_open(config: Config, entity_id: str, action: str) -> None:
@@ -166,27 +219,27 @@ def _cmd_open(config: Config, entity_id: str, action: str) -> None:
     elif action == "open_device":
         device_id = _lookup_device_id(client, entity_id)
         if not device_id:
-            notify_error(f"No device found for {entity_id}")
+            _notify_error(f"No device found for {entity_id}")
             return
         url = f"{ha_url}/config/devices/device/{device_id}"
     elif action == "open_area":
         area_id = _lookup_area_id(client, entity_id)
         if not area_id:
-            notify_error(f"No area found for {entity_id}")
+            _notify_error(f"No area found for {entity_id}")
             return
         url = f"{ha_url}/config/areas/area/{area_id}"
     elif action == "open_history":
         url = f"{ha_url}/history?entity_id={safe_id}"
     else:
-        notify_error(f"Unknown open action: {action}")
+        _notify_error(f"Unknown open action: {action}")
         return
 
     try:
         subprocess.run(["open", url], check=True)
     except Exception as exc:
-        notify_error(f"Failed to open in browser: {exc}")
+        _notify_error(f"Failed to open in browser: {exc}")
         return
-    notify("Opened in Home Assistant")
+    _notify("Opened in Home Assistant")
 
 
 def _cmd_system(config: Config, action: str) -> None:
@@ -196,7 +249,7 @@ def _cmd_system(config: Config, action: str) -> None:
             tracker.clear()
         finally:
             tracker.close()
-        notify("Usage history cleared")
+        _notify("Usage history cleared")
 
     elif action == "cache_refresh":
         cache = open_cache(config)
@@ -242,15 +295,15 @@ def _cmd_system(config: Config, action: str) -> None:
             count = len(entities)
         finally:
             cache.close()
-        notify(f"Cache refreshed: {count} entities")
+        _notify(f"Cache refreshed: {count} entities")
 
     elif action == "ha_restart":
         client = HAClient(config)
         try:
             client.call_service("homeassistant", "restart")
-            notify("Home Assistant is restarting")
+            _notify("Home Assistant is restarting")
         except Exception as exc:
-            notify_error(f"Restart failed: {exc}")
+            _notify_error(f"Restart failed: {exc}")
 
     elif action == "ha_check_config":
         client = HAClient(config)
@@ -258,11 +311,11 @@ def _cmd_system(config: Config, action: str) -> None:
             result = client.check_config()
             errors = result.get("errors")
             if errors:
-                notify_error(f"Config invalid: {errors}")
+                _notify_error(f"Config invalid: {errors}")
             else:
-                notify("Configuration is valid")
+                _notify("Configuration is valid")
         except Exception as exc:
-            notify_error(f"Config check failed: {exc}")
+            _notify_error(f"Config check failed: {exc}")
 
     elif action == "ha_error_log":
         client = HAClient(config)
@@ -271,36 +324,58 @@ def _cmd_system(config: Config, action: str) -> None:
         except Exception as exc:
             msg = str(exc)
             if "404" in msg:
-                notify_error(
+                _notify_error(
                     "Error log not available (endpoint returned 404). "
                     "This endpoint is not supported via Nabu Casa cloud — "
                     "use a local HA URL instead."
                 )
             else:
-                notify_error(f"Failed to fetch error log: {exc}")
+                _notify_error(f"Failed to fetch error log: {exc}")
             return
         if not log_text or not log_text.strip():
-            notify("Error log is empty")
+            _notify("Error log is empty")
             return
         try:
             subprocess.run(["pbcopy"], input=log_text.encode("utf-8"), check=True)
         except Exception as exc:
-            notify_error(f"Failed to copy log to clipboard: {exc}")
+            _notify_error(f"Failed to copy log to clipboard: {exc}")
             return
         first_line = log_text.strip().split("\n")[0][:80]
         lines = log_text.strip().count("\n") + 1
-        notify(f"Error log copied ({lines} lines): {first_line}")
+        _notify(f"Error log copied ({lines} lines): {first_line}")
 
     else:
-        notify_error(f"Unknown system action: {action}")
+        _notify_error(f"Unknown system action: {action}")
 
 
 def main() -> None:
+    """Run the action; configuration problems become a plain notification."""
+    try:
+        _main()
+    except HAWorkflowError as exc:
+        # Run Script output is the notification text: keep it readable.
+        notify_error(str(exc))
+    finally:
+        _notify_prefix[0] = ""
+
+
+def _main() -> None:
     entity_id = os.environ.get("entity_id", "").strip()
-    action = os.environ.get("action", "").strip()
+    action, server_id = split_action(os.environ.get("action", "").strip())
     domain = os.environ.get("domain", "").strip()
+    if server_id:
+        # The item names the server whose cache produced it.  Every
+        # Config.from_env() below (and any child process) resolves that
+        # server, never whichever one happens to be active now.
+        os.environ[SERVER_ENV_VAR] = server_id
     # Phase D: params come cleanly via Alfred variable — no ::encoding hack
     raw_params = os.environ.get("params", "").strip()
+
+    if entity_id == _SERVER_ENTITY:
+        notify(run_server_action(action, _server_context()))
+        return
+
+    _set_notify_prefix()
 
     if entity_id == _SYSTEM_ENTITY:
         config = Config.from_env()
@@ -308,7 +383,7 @@ def main() -> None:
         return
 
     if not entity_id or not action:
-        notify_error("Missing entity_id or action")
+        _notify_error("Missing entity_id or action")
         return
 
     # Route viewer / copy / open actions
@@ -323,14 +398,14 @@ def main() -> None:
                 friendly = state.get("attributes", {}).get("friendly_name", entity_id)
                 subprocess.run(["pbcopy"], input=text.encode("utf-8"), check=True)
                 current_state = state.get("state", "unknown")
-                notify(f"Copied details for {friendly} ({current_state})")
+                _notify(f"Copied details for {friendly} ({current_state})")
             except Exception as exc:
-                notify_error(f"Failed to fetch details: {exc}")
+                _notify_error(f"Failed to fetch details: {exc}")
         else:
             try:
                 changes = client.get_history(entity_id, hours=1)
                 if not changes:
-                    notify("No history found (last hour)")
+                    _notify("No history found (last hour)")
                     return
                 lines_out = [f"History for {entity_id} (last hour)", ""]
                 for entry in changes:
@@ -343,9 +418,9 @@ def main() -> None:
                     lines_out.append(f"{time_part}  {state}")
                 text = "\n".join(lines_out)
                 subprocess.run(["pbcopy"], input=text.encode("utf-8"), check=True)
-                notify(f"History copied ({len(changes)} state changes)")
+                _notify(f"History copied ({len(changes)} state changes)")
             except Exception as exc:
-                notify_error(f"Failed to fetch history: {exc}")
+                _notify_error(f"Failed to fetch history: {exc}")
         return
 
     if action.startswith("copy_"):
@@ -360,7 +435,7 @@ def main() -> None:
 
     # Guard: action_param is a UI routing pseudo-action, not executable
     if action == "action_param":
-        notify_error(
+        _notify_error(
             "Parameter entry was not completed. Use the actions menu to set parameters."
         )
         return
@@ -374,17 +449,17 @@ def main() -> None:
         try:
             service_data = parse_service_params(raw_params, domain, action)
         except ValueError as exc:
-            notify_error(str(exc))
+            _notify_error(str(exc))
             return
 
     config = Config.from_env()
     client = HAClient(config)
     result = dispatch_action(client, entity_id, action, service_data=service_data)
     if result.success:
-        notify(result.message)
+        _notify(result.message)
         _record_usage(config, entity_id)
     else:
-        notify_error(result.message)
+        _notify_error(result.message)
 
 
 if __name__ == "__main__":

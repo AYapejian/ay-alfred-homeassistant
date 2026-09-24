@@ -32,14 +32,14 @@ from ha_workflow.alfred import (  # noqa: E402
     AlfredOutput,
 )
 from ha_workflow.cache import EntityCache, open_cache  # noqa: E402
-from ha_workflow.config import Config  # noqa: E402
+from ha_workflow.config import Config, workflow_dirs  # noqa: E402
 from ha_workflow.entities import (  # noqa: E402
     DomainConfig,
     Entity,
     get_action_params,
     get_domain_config,
 )
-from ha_workflow.errors import handle_error  # noqa: E402
+from ha_workflow.errors import ConfigError, handle_error  # noqa: E402
 from ha_workflow.ha_client import HAClient  # noqa: E402
 from ha_workflow.notify import (  # noqa: E402
     notify,
@@ -47,8 +47,20 @@ from ha_workflow.notify import (  # noqa: E402
     notify_error,
 )
 from ha_workflow.params import parse_service_params  # noqa: E402
+from ha_workflow.profiles import (  # noqa: E402
+    SERVER_ENV_VAR,
+    load_servers,
+    resolve_server_id,
+    split_action,
+)
 from ha_workflow.query_parser import ParsedQuery, parse_query  # noqa: E402
 from ha_workflow.search import fuzzy_search, regex_search  # noqa: E402
+from ha_workflow.server_menu import (  # noqa: E402
+    ServerRow,
+    build_server_menu,
+    parse_server_query,
+)
+from ha_workflow.storage import read_server_status  # noqa: E402
 from ha_workflow.suggestions import build_domain_suggestions  # noqa: E402
 from ha_workflow.usage import UsageRecord, open_usage_tracker  # noqa: E402
 
@@ -126,7 +138,10 @@ def _match_system_commands(query: str, config: Config) -> list[AlfredItem]:
                 continue
         items.append(
             AlfredItem(
-                title=cmd["title"],
+                # With several servers, name the one this command hits.
+                title=f"{cmd['title']} ({config.server_display_name})"
+                if config.is_multi_server
+                else cmd["title"],
                 subtitle=cmd["subtitle"].format(server=config.server_label),
                 arg=_SYSTEM_ENTITY,
                 icon=_SYSTEM_ICON,
@@ -295,7 +310,8 @@ def _maybe_refresh_background(config: Config) -> None:
     os.makedirs(str(config.server_cache_dir), exist_ok=True)
     log_file = open(str(log_path), "w")  # noqa: SIM115
 
-    bg_env = {**os.environ, "HA_DEBUG": "1"}
+    # Pin the child to this server (see search_filter.py).
+    bg_env = {**os.environ, "HA_DEBUG": "1", SERVER_ENV_VAR: config.server_id}
     proc = subprocess.Popen(
         [sys.executable, cli_path, "cache", "refresh"],
         cwd=_WORKFLOW_ROOT,
@@ -385,8 +401,47 @@ def _cmd_config_validate() -> None:
     sys.stdout.write(output.to_json() + "\n")
 
 
+def _server_menu(filter_text: str) -> AlfredOutput:
+    """``server:`` — built from local state only (no config, no network)."""
+    env = dict(os.environ)
+    cache_dir, data_dir = workflow_dirs(env)
+    servers = load_servers(env, data_dir)
+    try:
+        active_id = resolve_server_id(env, data_dir)
+    except ConfigError:
+        active_id = "(invalid)"
+    rows: list[ServerRow] = []
+    for prof in servers.profiles:
+        status = read_server_status(cache_dir, prof.storage_key)
+        rows.append(
+            ServerRow(
+                id=prof.id,
+                name=prof.name,
+                host=prof.host,
+                is_default=prof.is_default,
+                entity_count=status.entity_count,
+                last_refresh=status.last_refresh,
+                last_error=status.last_error,
+                last_error_at=status.last_error_at,
+            )
+        )
+    return build_server_menu(
+        rows,
+        active_id,
+        filter_text,
+        file_error=servers.file_error,
+        file_exists=servers.file_exists,
+    )
+
+
 def _cmd_search(query: str) -> None:
     """Search cached entities and return Alfred JSON results."""
+    # `server:` is routed before config and cache (see search_filter.py).
+    server_filter = parse_server_query(query)
+    if server_filter is not None:
+        sys.stdout.write(_server_menu(server_filter).to_json() + "\n")
+        return
+
     config = Config.from_env()
     cache = open_cache(config)
     tracker = open_usage_tracker(config)
@@ -531,8 +586,11 @@ def _cmd_cache(args: list[str]) -> None:
                 _refresh_cache(config, cache)
             except Exception as exc:
                 # Background refresh — user may not see stderr, so toast it
+                prefix = (
+                    f"{config.server_display_name}: " if config.is_multi_server else ""
+                )
                 notify_background_error(
-                    f"Cache refresh failed: {exc}",
+                    f"{prefix}Cache refresh failed: {exc}",
                     subtitle="Home Assistant may be unreachable",
                 )
                 raise
@@ -580,7 +638,10 @@ def _cmd_cache(args: list[str]) -> None:
 def _cmd_action(args: list[str]) -> None:
     """Execute an action on an entity (or system command)."""
     entity_id = args[0] if args else ""
-    action = args[1] if len(args) > 1 else ""
+    action, server_id = split_action(args[1] if len(args) > 1 else "")
+    if server_id:
+        # Act on the server the item came from (see action_runner.py).
+        os.environ[SERVER_ENV_VAR] = server_id
 
     if entity_id == _SYSTEM_ENTITY:
         _cmd_system_action(action)

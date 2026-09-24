@@ -505,3 +505,101 @@ class TestClearScopedToServer:
         usage_items = [i for i in items if "usage" in i.title.lower()]
         assert len(usage_items) == 1
         assert "house-a.local:8123" in usage_items[0].subtitle
+
+
+# ---------------------------------------------------------------------------
+# Server profiles — storage keyed by profile identity
+# ---------------------------------------------------------------------------
+
+_LAKE_ID = "p-1a2b3c4d"
+
+
+def _profile_config(lib: _Lib, tmp_path: Path, url: str, name: str = "Lake") -> Any:
+    data_dir = tmp_path / "data"
+    data_dir.mkdir(parents=True, exist_ok=True)
+    (data_dir / "profiles.json").write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "profiles": [
+                    {
+                        "id": _LAKE_ID,
+                        "name": name,
+                        "urls": [url],
+                        "token_source": "keychain",
+                    }
+                ],
+            }
+        )
+    )
+    return lib.config.Config.from_env(
+        {
+            "HA_URL": "http://ha.local:8123",
+            "HA_TOKEN": "secret-token-value",
+            "HA_SERVER": _LAKE_ID,
+            "alfred_workflow_cache": str(tmp_path / "cache"),
+            "alfred_workflow_data": str(data_dir),
+        }
+    )
+
+
+class TestProfileStorage:
+    def test_default_profile_keeps_url_hash_key(
+        self, lib: _Lib, tmp_path: Path
+    ) -> None:
+        cfg = lib.make_config(tmp_path)
+        assert cfg.server_id == "default"
+        assert cfg.server_key == lib.config.server_key_for_url("http://ha.local:8123")
+
+    def test_profile_key_survives_url_edit(self, lib: _Lib, tmp_path: Path) -> None:
+        a = _profile_config(lib, tmp_path, "https://lake.example.net")
+        b = _profile_config(lib, tmp_path, "https://lake-new.example.net")
+        assert a.server_key == b.server_key == _LAKE_ID
+        assert a.server_data_dir == b.server_data_dir
+
+    def test_server_json_records_profile(self, lib: _Lib, tmp_path: Path) -> None:
+        cfg = _profile_config(lib, tmp_path, "https://lake.example.net")
+        lib.storage.prepare_server_storage(cfg)
+        info = json.loads((cfg.server_data_dir / "server.json").read_text())
+        assert info["profile_id"] == _LAKE_ID
+        assert info["profile_name"] == "Lake"
+        assert info["key"] == _LAKE_ID
+        assert "secret-token-value" not in json.dumps(info)
+
+    def test_server_json_follows_rename_and_url_edit(
+        self, lib: _Lib, tmp_path: Path
+    ) -> None:
+        cfg = _profile_config(lib, tmp_path, "https://lake.example.net")
+        lib.storage.prepare_server_storage(cfg)
+        info_path = cfg.server_data_dir / "server.json"
+        created = json.loads(info_path.read_text())["created"]
+        cfg2 = _profile_config(lib, tmp_path, "https://cabin.example.net", "Cabin")
+        lib.storage.prepare_server_storage(cfg2)
+        info = json.loads((cfg2.server_data_dir / "server.json").read_text())
+        assert info["profile_name"] == "Cabin"
+        assert info["url"] == "https://cabin.example.net"
+        assert info["created"] == created
+
+    def test_default_server_json_has_profile_fields(
+        self, lib: _Lib, tmp_path: Path
+    ) -> None:
+        cfg = lib.make_config(tmp_path)
+        lib.storage.prepare_server_storage(cfg)
+        info = json.loads((cfg.server_data_dir / "server.json").read_text())
+        assert info["profile_id"] == "default"
+        assert info["profile_name"] == "Default"
+
+    def test_legacy_files_never_migrate_into_a_profile(
+        self, lib: _Lib, tmp_path: Path
+    ) -> None:
+        (tmp_path / "data").mkdir(parents=True)
+        (tmp_path / "data" / "usage.db").write_text("legacy")
+        cfg = _profile_config(lib, tmp_path, "https://lake.example.net")
+        lib.storage.prepare_server_storage(cfg)
+        assert (tmp_path / "data" / "usage.db").exists()
+        assert not (cfg.server_data_dir / "usage.db").exists()
+        assert not (tmp_path / "data" / "servers" / ".legacy-migrated").exists()
+        # The default server still receives them afterwards.
+        default = lib.make_config(tmp_path)
+        lib.storage.prepare_server_storage(default)
+        assert (default.server_data_dir / "usage.db").read_text() == "legacy"

@@ -29,6 +29,7 @@ for _p in (
 from ha_lib.config import Config  # noqa: E402
 from ha_lib.errors import handle_error  # noqa: E402
 from ha_lib.notify import notify, notify_error  # noqa: E402
+from ha_lib.profiles import SERVER_ENV_VAR, split_action  # noqa: E402
 
 
 def main() -> None:
@@ -37,8 +38,14 @@ def main() -> None:
         notify_error("No entity_id in environment")
         return
 
+    # ``action`` carries ``@@<server id>``: open the item's own server.
+    _, server_id = split_action(os.environ.get("action", "").strip())
+    env = dict(os.environ)
+    if server_id:
+        env[SERVER_ENV_VAR] = server_id
+
     try:
-        config = Config.from_env()
+        config = Config.from_env(env)
     except Exception as exc:
         notify_error(f"Configuration error: {exc}")
         return
@@ -52,7 +59,8 @@ def main() -> None:
         notify_error(f"Failed to open in browser: {exc}")
         return
 
-    notify("Opened in Home Assistant")
+    prefix = f"{config.server_display_name}: " if config.is_multi_server else ""
+    notify(f"{prefix}Opened in Home Assistant")
 
 
 if __name__ == "__main__":

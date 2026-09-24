@@ -30,8 +30,15 @@
 - Scripted screenshots against the demo instance; cheatsheet and user guide built on them
 
 ### 1.7.4 — Server profiles + `ha server:` switcher
-- [ ] Not started — spec: `specs/spec-001-server-profiles.md`
+- [ ] In progress — started 2026-09-24 · branch `feat/47-server-profiles` ([#47](https://github.com/AYapejian/ay-alfred-homeassistant/issues/47)) · spec: `specs/spec-001-server-profiles.md`
 - Multiple configured servers, switchable from Alfred; profile supplies `Config.server_key_override`
+- Default server = `HA_URL`/`HA_TOKEN` (unchanged); added servers in `<data>/profiles.json` (no secrets), tokens in the login Keychain via `security -i` on stdin (never argv)
+- Active server: `HA_SERVER` env > `<data>/active_server` > `default`, resolved only in `Config.from_env()`; lazy Keychain read; fails closed (stale pointer, invalid file, missing token)
+- `ha server:` listing routed before config/cache; Enter switches; ⌘ opens a server sub-menu (test, re-enter token, remove) in the existing actions Script Filter — no `info.plist` change
+- Every item carries `<action>@@<server id>`; runner / open-in-HA / background refresh pin `HA_SERVER` to it
+- Wrong-house signals when >1 server: subtitle badge/name, system-command titles, notification prefix
+- **Tests:** `test_profiles.py`, `test_keychain.py` (argv-leak), `test_server_resolution.py`, `test_server_menu.py`, `test_server_actions.py`, `test_server_add.py`, `test_server_routing.py`, `test_wrong_house.py`; `conftest.py` blocks the real Keychain, real dialogs and `HOME`
+- **Manual QA still needed on a Mac:** `scripts/QA_CHEATSHEET.md` → "Server profiles"
 
 ---
 
