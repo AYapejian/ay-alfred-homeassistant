@@ -11,6 +11,8 @@
 
 An [Alfred](https://www.alfredapp.com/) workflow for macOS that brings [Home Assistant](https://www.home-assistant.io/) to your fingertips. Search entities, call services, toggle automations, and more — all from Alfred's search bar.
 
+![Searching and toggling a light](docs/images/hero.gif)
+
 > **Note:** This is an active personal project, built largely with AI-assisted development. It works well for my setup, but it is not production-grade software. APIs and behavior may change between versions. If you find it useful, great — just know what you're getting into.
 
 ## What It Does
@@ -19,7 +21,7 @@ This is a native macOS Alfred workflow — not a Home Assistant add-on. It runs 
 
 **Features:**
 
-- Fuzzy search across all HA entities (by entity ID, friendly name, or attributes)
+- Fuzzy search across all HA entities (by friendly name, entity ID, or device class)
 - Domain filtering (e.g., `light:bedroom` to search only lights)
 - Regex search (e.g., `/.*kitchen.*/` for pattern matching)
 - Usage-based ranking — frequently used entities float to the top
@@ -28,7 +30,7 @@ This is a native macOS Alfred workflow — not a Home Assistant add-on. It runs 
 - Parameterized actions — set brightness, color temp, etc. with inline `key:value` syntax
 - Copy entity ID/details, open entity or history in HA
 - HA system commands — restart, check config, view error log
-- System commands (cache refresh, clear usage data) accessible from search
+- System commands (cache refresh, clear usage data) under `ha system`
 - Cached entity index in SQLite for fast, offline-capable lookups
 - Per-server storage — the entity cache and usage history are kept separately for each `HA_URL`, so pointing the workflow at another Home Assistant never mixes or clears the first one's data (existing data moves into the current server's folder on upgrade)
 
@@ -55,13 +57,12 @@ This is a native macOS Alfred workflow — not a Home Assistant add-on. It runs 
 
 ## Usage
 
-- `ha <query>` — search entities. **Enter** runs the default action (toggle, turn on/off, etc.)
-- **Cmd + Enter** — open the action sub-menu for the selected entity
-- In the action sub-menu, select **Set Params...** to enter parameters like `brightness:100` or `color_temp_kelvin:3000`
+Type `ha` and a search term: plain words (`ha kitchen`), a domain filter (`ha light:living`), or a regex (`ha /door/`).
+Press **Enter** to run the entity's default action, such as toggling a light. **⌘ Enter** opens the action menu, which includes actions that take parameters (`brightness:50%,color:red`).
+**⌥ Enter** copies the entity ID and **⌃ Enter** opens the entity in Home Assistant. `ha system` lists the cache, restart, config-check and error-log commands.
 
-### Promoting entities to the top
-
-Create a label in Home Assistant (Settings → Areas & zones → Labels) named **Alfred Preferred** — HA stores it with the slug `alfred_preferred`. Tag any entity *or device* with it and those entities float above unlabeled ones in search results. Device-level labels propagate to every entity on that device. Your own usage history still takes priority over labeled entities. Override the slug with `HA_PREFERRED_LABEL` if you prefer a different label name.
+- [Cheatsheet](docs/cheatsheet.md): the syntax on one page
+- [User guide](docs/guide.md): install, searching, actions, parameters, and troubleshooting
 
 ## Development
 

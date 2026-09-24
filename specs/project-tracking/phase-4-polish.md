@@ -56,7 +56,8 @@ Several Phase 4 tasks were partially or fully addressed in earlier phases:
 
 
 ### 4.6 — Documentation
-- [ ] **Pending** Check all documentation is up to date with the latest features and changes, and is clear and comprehensive for new users.
+- [ ] **In progress** (started 2026-09-24, #9, branch `docs/9-user-guide`): `docs/cheatsheet.md`, `docs/guide.md`, README usage summary; screenshots pending (`docs/images/SHOTS.md`)
+- Check all documentation is up to date with the latest features and changes, and is clear and comprehensive for new users.
 - README: installation, configuration, usage, supported entities, action reference, troubleshooting
 - Search syntax reference: plain text, `domain:text`, `/regex/`, system commands
 
