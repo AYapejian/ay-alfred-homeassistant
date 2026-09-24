@@ -65,14 +65,14 @@ _SYSTEM_COMMANDS: list[dict[str, str]] = [
     # History commands
     {
         "title": "History: Clear usage data",
-        "subtitle": "System \u00b7 Reset search suggestions and rankings",
+        "subtitle": "System \u00b7 Reset suggestions and rankings for {server}",
         "action": "usage_clear",
         "keywords": "history clear usage reset suggestions data",
     },
     # Cache commands
     {
         "title": "Cache: Refresh entities",
-        "subtitle": "System \u00b7 Re-fetch all entities from Home Assistant",
+        "subtitle": "System \u00b7 Re-fetch all entities from {server}",
         "action": "cache_refresh",
         "keywords": "cache refresh reload entities update",
     },
@@ -101,7 +101,7 @@ _SYSTEM_COMMANDS: list[dict[str, str]] = [
 _SYSTEM_ICON = AlfredIcon(path="icons/_system.png")
 
 
-def _match_system_commands(query: str) -> list[AlfredItem]:
+def _match_system_commands(query: str, config: Config) -> list[AlfredItem]:
     """Return system command items matching *query*.
 
     System commands are hidden behind the ``system`` subcommand: the first
@@ -127,7 +127,7 @@ def _match_system_commands(query: str) -> list[AlfredItem]:
         items.append(
             AlfredItem(
                 title=cmd["title"],
-                subtitle=cmd["subtitle"],
+                subtitle=cmd["subtitle"].format(server=config.server_label),
                 arg=_SYSTEM_ENTITY,
                 icon=_SYSTEM_ICON,
                 uid=f"system_{cmd['action']}",
@@ -273,7 +273,7 @@ def _refresh_cache(config: Config, cache: EntityCache) -> None:
 
 def _maybe_refresh_background(config: Config) -> None:
     """Spawn a detached subprocess to refresh the cache, if not already running."""
-    lock_path = config.cache_dir / _LOCK_FILENAME
+    lock_path = config.server_cache_dir / _LOCK_FILENAME
 
     if lock_path.exists():
         try:
@@ -291,8 +291,8 @@ def _maybe_refresh_background(config: Config) -> None:
     _dbg(f"bg_refresh: cwd={_WORKFLOW_ROOT}")
 
     # Log background refresh output to a file for debugging
-    log_path = config.cache_dir / "refresh.log"
-    os.makedirs(str(config.cache_dir), exist_ok=True)
+    log_path = config.server_cache_dir / "refresh.log"
+    os.makedirs(str(config.server_cache_dir), exist_ok=True)
     log_file = open(str(log_path), "w")  # noqa: SIM115
 
     bg_env = {**os.environ, "HA_DEBUG": "1"}
@@ -418,7 +418,7 @@ def _cmd_search(query: str) -> None:
             )
         else:
             # `system` subcommand: show only system commands, no entity search.
-            sys_items = _match_system_commands(query)
+            sys_items = _match_system_commands(query, config)
             if sys_items:
                 output = AlfredOutput(items=sys_items)
                 if needs_refresh:
@@ -537,7 +537,7 @@ def _cmd_cache(args: list[str]) -> None:
                 )
                 raise
             # Clean up lock file (we may have been invoked as a background refresh)
-            lock_path = config.cache_dir / _LOCK_FILENAME
+            lock_path = config.server_cache_dir / _LOCK_FILENAME
             if lock_path.exists():
                 lock_path.unlink(missing_ok=True)
             _dbg("cache refresh: lock cleaned")

@@ -11,6 +11,7 @@ from typing import Any, Optional, Union
 
 from ha_workflow.config import Config
 from ha_workflow.entities import Entity
+from ha_workflow.storage import prepare_server_storage
 
 
 class EntityCache:
@@ -204,6 +205,7 @@ class EntityCache:
 
 
 def open_cache(config: Config) -> EntityCache:
-    """Open the entity cache for the given workflow configuration."""
-    db_path = config.cache_dir / "entities.db"
+    """Open the current server's entity cache (``server_cache_dir/entities.db``)."""
+    prepare_server_storage(config)
+    db_path = config.server_cache_dir / "entities.db"
     return EntityCache(db_path)

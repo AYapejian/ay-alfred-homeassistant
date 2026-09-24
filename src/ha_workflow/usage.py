@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Optional, Union
 
 from ha_workflow.config import Config
+from ha_workflow.storage import prepare_server_storage
 
 
 @dataclass(frozen=True)
@@ -26,7 +27,9 @@ class UsageTracker:
 
     The database lives in ``data_dir`` (not ``cache_dir``) so it survives
     cache clears — Alfred may clean ``cache_dir`` at any time, but
-    ``data_dir`` persists.
+    ``data_dir`` persists.  :func:`open_usage_tracker` opens the current
+    server's database (``server_data_dir``), so each HA server keeps its own
+    history.
     """
 
     def __init__(self, db_path: Union[str, Path]) -> None:
@@ -105,6 +108,7 @@ class UsageTracker:
 
 
 def open_usage_tracker(config: Config) -> UsageTracker:
-    """Open the usage tracker, storing data in ``config.data_dir/usage.db``."""
-    db_path = config.data_dir / "usage.db"
+    """Open the current server's usage tracker (``server_data_dir/usage.db``)."""
+    prepare_server_storage(config)
+    db_path = config.server_data_dir / "usage.db"
     return UsageTracker(db_path)

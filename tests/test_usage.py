@@ -144,6 +144,6 @@ class TestOpenUsageTracker:
             data_dir=tmp_path / "data",
         )
         tracker = open_usage_tracker(config)
-        db_file = tmp_path / "data" / "usage.db"
+        db_file = config.server_data_dir / "usage.db"
         assert db_file.exists()
         tracker.close()
