@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import os
+import re
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
@@ -16,6 +17,9 @@ _DEFAULT_PREFERRED_LABEL = "alfred_preferred"
 
 _DEFAULT_PORTS = {"http": 80, "https": 443}
 _SERVER_KEY_LEN = 12
+# A server key names a directory under ``servers/``: no separators, no
+# leading dot/dash, bounded length.
+_SAFE_SERVER_KEY = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$")
 
 
 def normalize_server_url(url: str) -> str:
@@ -81,6 +85,11 @@ class Config:
         server-profiles feature).
         """
         if self.server_key_override:
+            if not _SAFE_SERVER_KEY.match(self.server_key_override):
+                raise ConfigError(
+                    f"Invalid server key {self.server_key_override!r}: use letters, "
+                    "digits, '-' or '_' (max 64)."
+                )
             return self.server_key_override
         return server_key_for_url(self.ha_url)
 

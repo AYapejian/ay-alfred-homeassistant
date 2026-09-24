@@ -59,10 +59,16 @@ def prepare_server_storage(config: Config) -> None:
     try:
         migrate_legacy_storage(config)
     except OSError as exc:
-        # A failed migration must not break search; the legacy files stay
-        # put (no marker is written) and the next invocation retries.
+        # A failed migration (e.g. a permission error) must not break search:
+        # no marker is written, so the next invocation retries.  A legacy file
+        # that merely vanishes mid-move is skipped inside _move_legacy — some
+        # other process moved it — and does not block the marker.
         sys.stderr.write(f"[ha-workflow] legacy storage migration failed: {exc}\n")
-    _write_server_info(config)
+    try:
+        _write_server_info(config)
+    except OSError as exc:
+        # server.json is advisory debug info; never let it block search.
+        sys.stderr.write(f"[ha-workflow] could not write server.json: {exc}\n")
 
 
 def migrate_legacy_storage(config: Config) -> list[str]:

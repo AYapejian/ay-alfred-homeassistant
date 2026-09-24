@@ -132,6 +132,24 @@ class TestConfigServerDirs:
         assert cfg.server_cache_dir == tmp_path / "cache" / "servers" / "profile-demo"
         assert cfg.server_data_dir == tmp_path / "data" / "servers" / "profile-demo"
 
+    @pytest.mark.parametrize(
+        "bad", ["../escape", "a/b", "..", ".hidden", "-lead", "sp ace", "x" * 65]
+    )
+    def test_key_override_rejects_unsafe_values(
+        self, lib: _Lib, tmp_path: Path, bad: str
+    ) -> None:
+        errors = importlib.import_module(f"{lib.package}.errors")
+        cfg = lib.config.Config(
+            ha_url="http://ha.local:8123",
+            ha_token="t",
+            cache_ttl=60,
+            cache_dir=tmp_path / "cache",
+            data_dir=tmp_path / "data",
+            server_key_override=bad,
+        )
+        with pytest.raises(errors.ConfigError):
+            _ = cfg.server_key
+
 
 # ---------------------------------------------------------------------------
 # prepare_server_storage — dirs + server.json
@@ -139,6 +157,16 @@ class TestConfigServerDirs:
 
 
 class TestPrepareServerStorage:
+    def test_server_info_write_failure_does_not_break_callers(
+        self, lib: _Lib, tmp_path: Path
+    ) -> None:
+        cfg = lib.make_config(tmp_path)
+        with patch.object(
+            lib.storage, "_write_server_info", side_effect=OSError("disk full")
+        ):
+            lib.storage.prepare_server_storage(cfg)  # must not raise
+        assert cfg.server_data_dir.is_dir()
+
     def test_creates_dirs(self, lib: _Lib, tmp_path: Path) -> None:
         cfg = lib.make_config(tmp_path)
         lib.storage.prepare_server_storage(cfg)
