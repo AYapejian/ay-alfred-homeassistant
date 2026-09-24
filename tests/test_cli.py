@@ -182,7 +182,7 @@ class TestSearchCommand:
         mock_open_tracker: MagicMock,
         capsys: object,
     ) -> None:
-        mock_from_env.return_value = MagicMock(cache_ttl=60)
+        mock_from_env.return_value = MagicMock(cache_ttl=60, is_multi_server=False)
         mock_open_cache.return_value = _mock_cache()
         mock_open_tracker.return_value = _mock_tracker()
 
@@ -208,7 +208,7 @@ class TestSearchCommand:
         mock_open_tracker: MagicMock,
         capsys: object,
     ) -> None:
-        mock_from_env.return_value = MagicMock(cache_ttl=60)
+        mock_from_env.return_value = MagicMock(cache_ttl=60, is_multi_server=False)
         mock_open_cache.return_value = _mock_cache()
         mock_open_tracker.return_value = _mock_tracker()
 
@@ -231,7 +231,7 @@ class TestSearchCommand:
         mock_open_tracker: MagicMock,
         capsys: object,
     ) -> None:
-        mock_from_env.return_value = MagicMock(cache_ttl=60)
+        mock_from_env.return_value = MagicMock(cache_ttl=60, is_multi_server=False)
         mock_open_cache.return_value = _mock_cache()
         mock_open_tracker.return_value = _mock_tracker()
 
@@ -261,7 +261,7 @@ class TestSearchCommand:
         mock_open_tracker: MagicMock,
         capsys: object,
     ) -> None:
-        mock_from_env.return_value = MagicMock(cache_ttl=60)
+        mock_from_env.return_value = MagicMock(cache_ttl=60, is_multi_server=False)
         mock_open_cache.return_value = _mock_cache(stale=True)
         mock_open_tracker.return_value = _mock_tracker()
 
@@ -284,7 +284,7 @@ class TestSearchCommand:
         mock_open_tracker: MagicMock,
         capsys: object,
     ) -> None:
-        mock_from_env.return_value = MagicMock(cache_ttl=60)
+        mock_from_env.return_value = MagicMock(cache_ttl=60, is_multi_server=False)
         mock_open_cache.return_value = _mock_cache(cache_age=None)
         mock_open_tracker.return_value = _mock_tracker()
 
@@ -308,7 +308,7 @@ class TestSearchCommand:
         mock_open_tracker: MagicMock,
         capsys: object,
     ) -> None:
-        mock_from_env.return_value = MagicMock(cache_ttl=60)
+        mock_from_env.return_value = MagicMock(cache_ttl=60, is_multi_server=False)
         mock_open_cache.return_value = _mock_cache()
         mock_open_tracker.return_value = _mock_tracker()
 
@@ -339,7 +339,7 @@ class TestSearchCommand:
                 area_name="Living Room",
             ),
         ]
-        mock_from_env.return_value = MagicMock(cache_ttl=60)
+        mock_from_env.return_value = MagicMock(cache_ttl=60, is_multi_server=False)
         mock_open_cache.return_value = _mock_cache(entities=entities)
         mock_open_tracker.return_value = _mock_tracker()
 
@@ -367,7 +367,7 @@ class TestSearchCommand:
         entities = [
             _entity("switch.kitchen", "off", "Kitchen Switch"),
         ]
-        mock_from_env.return_value = MagicMock(cache_ttl=60)
+        mock_from_env.return_value = MagicMock(cache_ttl=60, is_multi_server=False)
         mock_open_cache.return_value = _mock_cache(entities=entities)
         mock_open_tracker.return_value = _mock_tracker()
 
@@ -390,7 +390,7 @@ class TestSearchCommand:
         mock_open_tracker: MagicMock,
         capsys: object,
     ) -> None:
-        mock_from_env.return_value = MagicMock(cache_ttl=60)
+        mock_from_env.return_value = MagicMock(cache_ttl=60, is_multi_server=False)
         mock_open_cache.return_value = _mock_cache()
         mock_open_tracker.return_value = _mock_tracker()
 
@@ -422,7 +422,7 @@ class TestSearchCommand:
         entities = [
             _entity("sensor.temperature", "23.5", "Temperature"),
         ]
-        mock_from_env.return_value = MagicMock(cache_ttl=60)
+        mock_from_env.return_value = MagicMock(cache_ttl=60, is_multi_server=False)
         mock_open_cache.return_value = _mock_cache(entities=entities)
         mock_open_tracker.return_value = _mock_tracker()
 
@@ -474,7 +474,7 @@ class TestCacheCommand:
         mock_open_cache: MagicMock,
         capsys: object,
     ) -> None:
-        mock_from_env.return_value = MagicMock(cache_ttl=60)
+        mock_from_env.return_value = MagicMock(cache_ttl=60, is_multi_server=False)
         mock_open_cache.return_value = _mock_cache(cache_age=30.0)
 
         main(["cache", "status"])
@@ -492,7 +492,7 @@ class TestCacheCommand:
         mock_open_cache: MagicMock,
         capsys: object,
     ) -> None:
-        mock_from_env.return_value = MagicMock(cache_ttl=60)
+        mock_from_env.return_value = MagicMock(cache_ttl=60, is_multi_server=False)
         mock_open_cache.return_value = _mock_cache(cache_age=None)
 
         main(["cache", "status"])
@@ -599,7 +599,7 @@ class TestDomainFilterSearch:
         mock_open_tracker: MagicMock,
         capsys: object,
     ) -> None:
-        mock_from_env.return_value = MagicMock(cache_ttl=60)
+        mock_from_env.return_value = MagicMock(cache_ttl=60, is_multi_server=False)
         mock_open_cache.return_value = _mock_cache()
         mock_open_tracker.return_value = _mock_tracker()
 
@@ -624,7 +624,7 @@ class TestDomainFilterSearch:
         mock_open_tracker: MagicMock,
         capsys: object,
     ) -> None:
-        mock_from_env.return_value = MagicMock(cache_ttl=60)
+        mock_from_env.return_value = MagicMock(cache_ttl=60, is_multi_server=False)
         mock_open_cache.return_value = _mock_cache()
         mock_open_tracker.return_value = _mock_tracker()
 
@@ -649,7 +649,7 @@ class TestRegexSearch:
         mock_open_tracker: MagicMock,
         capsys: object,
     ) -> None:
-        mock_from_env.return_value = MagicMock(cache_ttl=60)
+        mock_from_env.return_value = MagicMock(cache_ttl=60, is_multi_server=False)
         mock_open_cache.return_value = _mock_cache()
         mock_open_tracker.return_value = _mock_tracker()
 
@@ -673,7 +673,7 @@ class TestRegexSearch:
         mock_open_tracker: MagicMock,
         capsys: object,
     ) -> None:
-        mock_from_env.return_value = MagicMock(cache_ttl=60)
+        mock_from_env.return_value = MagicMock(cache_ttl=60, is_multi_server=False)
         mock_open_cache.return_value = _mock_cache()
         mock_open_tracker.return_value = _mock_tracker()
 
@@ -698,7 +698,7 @@ class TestDomainSuggestionsInSearch:
         mock_open_tracker: MagicMock,
         capsys: object,
     ) -> None:
-        mock_from_env.return_value = MagicMock(cache_ttl=60)
+        mock_from_env.return_value = MagicMock(cache_ttl=60, is_multi_server=False)
         mock_open_cache.return_value = _mock_cache(
             domain_counts={"light": 10, "switch": 5, "sensor": 20}
         )
@@ -762,7 +762,7 @@ class TestSystemCommandsInSearch:
         mock_open_tracker: MagicMock,
         capsys: object,
     ) -> None:
-        mock_from_env.return_value = MagicMock(cache_ttl=60)
+        mock_from_env.return_value = MagicMock(cache_ttl=60, is_multi_server=False)
         mock_open_cache.return_value = _mock_cache()
         mock_open_tracker.return_value = _mock_tracker()
 
@@ -793,7 +793,7 @@ class TestSystemCommandsInSearch:
         mock_open_tracker: MagicMock,
         capsys: object,
     ) -> None:
-        mock_from_env.return_value = MagicMock(cache_ttl=60)
+        mock_from_env.return_value = MagicMock(cache_ttl=60, is_multi_server=False)
         mock_open_cache.return_value = _mock_cache()
         mock_open_tracker.return_value = _mock_tracker()
 
@@ -816,7 +816,7 @@ class TestSystemCommandsInSearch:
         mock_open_tracker: MagicMock,
         capsys: object,
     ) -> None:
-        mock_from_env.return_value = MagicMock(cache_ttl=60)
+        mock_from_env.return_value = MagicMock(cache_ttl=60, is_multi_server=False)
         mock_open_cache.return_value = _mock_cache()
         mock_open_tracker.return_value = _mock_tracker()
 
@@ -1107,7 +1107,7 @@ class TestSystemCommandsSearch:
         mock_open_tracker: MagicMock,
         capsys: object,
     ) -> None:
-        mock_from_env.return_value = MagicMock(cache_ttl=60)
+        mock_from_env.return_value = MagicMock(cache_ttl=60, is_multi_server=False)
         mock_open_cache.return_value = _mock_cache()
         mock_open_tracker.return_value = _mock_tracker()
 
@@ -1130,7 +1130,7 @@ class TestSystemCommandsSearch:
         mock_open_tracker: MagicMock,
         capsys: object,
     ) -> None:
-        mock_from_env.return_value = MagicMock(cache_ttl=60)
+        mock_from_env.return_value = MagicMock(cache_ttl=60, is_multi_server=False)
         mock_open_cache.return_value = _mock_cache()
         mock_open_tracker.return_value = _mock_tracker()
 
@@ -1153,7 +1153,7 @@ class TestSystemCommandsSearch:
         mock_open_tracker: MagicMock,
         capsys: object,
     ) -> None:
-        mock_from_env.return_value = MagicMock(cache_ttl=60)
+        mock_from_env.return_value = MagicMock(cache_ttl=60, is_multi_server=False)
         mock_open_cache.return_value = _mock_cache()
         mock_open_tracker.return_value = _mock_tracker()
 
@@ -1176,7 +1176,7 @@ class TestSystemCommandsSearch:
         mock_open_tracker: MagicMock,
         capsys: object,
     ) -> None:
-        mock_from_env.return_value = MagicMock(cache_ttl=60)
+        mock_from_env.return_value = MagicMock(cache_ttl=60, is_multi_server=False)
         mock_open_cache.return_value = _mock_cache()
         mock_open_tracker.return_value = _mock_tracker()
 
@@ -1205,7 +1205,7 @@ class TestSystemCommandsSearch:
         mock_open_tracker: MagicMock,
         capsys: object,
     ) -> None:
-        mock_from_env.return_value = MagicMock(cache_ttl=60)
+        mock_from_env.return_value = MagicMock(cache_ttl=60, is_multi_server=False)
         mock_open_cache.return_value = _mock_cache()
         mock_open_tracker.return_value = _mock_tracker()
 
@@ -1234,7 +1234,7 @@ class TestSystemCommandsSearch:
     ) -> None:
         # Previously "cache" or "restart" would surface a system command;
         # now they must not, since those are hidden behind `system`.
-        mock_from_env.return_value = MagicMock(cache_ttl=60)
+        mock_from_env.return_value = MagicMock(cache_ttl=60, is_multi_server=False)
         mock_open_cache.return_value = _mock_cache()
         mock_open_tracker.return_value = _mock_tracker()
 

@@ -59,7 +59,8 @@ def main() -> None:
         notify_error(f"Failed to open in browser: {exc}")
         return
 
-    notify("Opened in Home Assistant")
+    prefix = f"{config.server_display_name}: " if config.is_multi_server else ""
+    notify(f"{prefix}Opened in Home Assistant")
 
 
 if __name__ == "__main__":

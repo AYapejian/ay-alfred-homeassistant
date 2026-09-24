@@ -138,7 +138,10 @@ def _match_system_commands(query: str, config: Config) -> list[AlfredItem]:
                 continue
         items.append(
             AlfredItem(
-                title=cmd["title"],
+                # With several servers, name the one this command hits.
+                title=f"{cmd['title']} ({config.server_display_name})"
+                if config.is_multi_server
+                else cmd["title"],
                 subtitle=cmd["subtitle"].format(server=config.server_label),
                 arg=_SYSTEM_ENTITY,
                 icon=_SYSTEM_ICON,
@@ -583,8 +586,11 @@ def _cmd_cache(args: list[str]) -> None:
                 _refresh_cache(config, cache)
             except Exception as exc:
                 # Background refresh — user may not see stderr, so toast it
+                prefix = (
+                    f"{config.server_display_name}: " if config.is_multi_server else ""
+                )
                 notify_background_error(
-                    f"Cache refresh failed: {exc}",
+                    f"{prefix}Cache refresh failed: {exc}",
                     subtitle="Home Assistant may be unreachable",
                 )
                 raise

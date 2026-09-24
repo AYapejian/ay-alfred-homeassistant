@@ -132,7 +132,10 @@ def _match_system_commands(query: str, config: Config) -> list[AlfredItem]:
                 continue
         items.append(
             AlfredItem(
-                title=cmd["title"],
+                # With several servers, name the one this command hits.
+                title=f"{cmd['title']} ({config.server_display_name})"
+                if config.is_multi_server
+                else cmd["title"],
                 subtitle=cmd["subtitle"].format(server=config.server_label),
                 arg=_SYSTEM_ENTITY,
                 icon=_SYSTEM_ICON,
@@ -163,6 +166,9 @@ def _build_search_output(
         state_text = dc.subtitle_formatter(entity)
         prefix = entity.area_name if entity.area_name else entity.domain
         subtitle = f"{prefix} \u00b7 {state_text}"
+        if config.is_multi_server:
+            # Wrong-house signal: which server this entity lives on.
+            subtitle = f"{config.server_prefix} \u00b7 {subtitle}"
 
         item = AlfredItem(
             title=entity.friendly_name,
@@ -232,6 +238,16 @@ def _build_search_output(
                     valid=False,
                     autocomplete=f"{domain}:",
                     uid=f"domain_hint_{domain}",
+                )
+            )
+        if config.is_multi_server:
+            items.append(
+                AlfredItem(
+                    title=f"Server: {config.server_display_name}",
+                    subtitle="Tab to switch servers (ha server:)",
+                    icon=AlfredIcon(path="icons/_server.png"),
+                    valid=False,
+                    autocomplete="server:",
                 )
             )
 
@@ -341,7 +357,9 @@ def main() -> None:
                 items=[
                     AlfredItem(
                         title="Loading entities\u2026",
-                        subtitle="Fetching data from Home Assistant",
+                        subtitle=f"Fetching data from {config.server_display_name}"
+                        if config.is_multi_server
+                        else "Fetching data from Home Assistant",
                         icon=AlfredIcon(path="icon.png"),
                         valid=False,
                     )
@@ -500,6 +518,8 @@ def _quick_exec(
         subtitle = f"{action_label} \u2192 {summary}"
     else:
         subtitle = f"{action_label} \u00b7 {entity.entity_id}"
+    if config.is_multi_server:
+        subtitle = f"{config.server_prefix} \u00b7 {subtitle}"
 
     item = AlfredItem(
         title=f"\u21b5 {action_label} {entity.friendly_name}",

@@ -153,6 +153,7 @@ def main() -> None:
     if server_id:
         env[SERVER_ENV_VAR] = server_id
 
+    config: Optional[Config] = None
     try:
         config = Config.from_env(env)
         entity = _get_cached_entity(config, entity_id)
@@ -175,6 +176,8 @@ def main() -> None:
     relative = _format_relative_time(last_changed)
     if relative:
         header_subtitle += f" \u00b7 Changed {relative}"
+    if config is not None and config.is_multi_server:
+        header_subtitle = f"{config.server_prefix} \u00b7 {header_subtitle}"
     items.append(
         AlfredItem(
             title=friendly,
