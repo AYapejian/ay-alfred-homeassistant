@@ -39,8 +39,8 @@ Several Phase 4 tasks were partially or fully addressed in earlier phases:
 
 ### 4.4 — Entity item ux improvements
 - [ ] **Pending** Entities should...
-- [ ] If state is open/closed, on/off, locked/unlocked, motion,no-motion (cleared)... These type of entties should have a visbily informative way to dsipaly the different stes.
-- [ ] If entities are unavailable they should be visually distinct (e.g. grayed out, "unavailable" subtitle), font smaller and itllaicized, default action will be opening submenu
+- [ ] If state is open/closed, on/off, locked/unlocked, motion,no-motion (cleared)... These type of entities should have a visibly informative way to display the different states.
+- [ ] If entities are unavailable they should be visually distinct (e.g. grayed out, "unavailable" subtitle), font smaller and italicized, default action will be opening submenu
 - [ ] If entities are sensors then display the state and unit of measurement in the subtitle, and the default action will be opening the submenu
 - [ ] If entities are media players then display the source in the subtitle, and the default will be play/pause toggle
 - [ ] If entities are lights then display the brightness in subtitle.  Also render the light color temp or color in the subtitle line as a rectangular box. Default action will be toggle on/off
