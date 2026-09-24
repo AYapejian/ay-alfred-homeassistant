@@ -1,0 +1,22 @@
+# Throwaway demo Home Assistant for development and documentation.
+# Driven by scripts/demo-ha.sh — see demo/README.md.
+#
+# Image pin: bump the tag below to a newer stable release from
+# https://github.com/home-assistant/core/releases, then run
+# `scripts/demo-ha.sh reset && scripts/demo-ha.sh up` to verify onboarding
+# and the demo integration still work on the new version.
+name: ay-alfred-demo-ha
+
+services:
+  homeassistant:
+    container_name: ay-alfred-demo-ha
+    image: "ghcr.io/home-assistant/home-assistant:2026.9.3"
+    # Localhost only, on 8124 so it never clashes with a real HA on 8123.
+    ports:
+      - "127.0.0.1:8124:8123"
+    volumes:
+      - ./config:/config
+    environment:
+      TZ: "UTC"
+    restart: "no"
+    stop_grace_period: 30s

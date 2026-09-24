@@ -130,3 +130,11 @@ temp/
 *.bak
 *.swp
 *.orig
+
+# -----------------------------------------------------------------------------
+# Demo Home Assistant (scripts/demo-ha.sh) — runtime state and token
+# -----------------------------------------------------------------------------
+demo/config/*
+!demo/config/configuration.yaml
+demo/.demo-token
+demo/.demo-token.tmp
