@@ -19,12 +19,23 @@ def fixtures_dir() -> Path:
 
 
 @pytest.fixture(autouse=True)
-def _no_real_keychain(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
-    """Block the real Keychain and the owner's server selection in every test."""
+def _no_real_keychain(
+    monkeypatch: pytest.MonkeyPatch, tmp_path_factory: pytest.TempPathFactory
+) -> Iterator[None]:
+    """Isolate every test from the real Keychain and the owner's server state.
+
+    * ``security`` resolves to a path that does not exist.
+    * ``HA_SERVER`` and Alfred's dir variables are cleared.
+    * ``HOME`` points at a scratch dir, so the dev-fallback data dir
+      (``~/.cache/ha-workflow``) — and any ``profiles.json`` /
+      ``active_server`` in it — is never read.
+    """
     import ha_lib.keychain
     import ha_workflow.keychain
 
     for mod in (ha_lib.keychain, ha_workflow.keychain):
         monkeypatch.setattr(mod, "SECURITY_BIN", _DISABLED_SECURITY_BIN)
-    monkeypatch.delenv("HA_SERVER", raising=False)
+    for var in ("HA_SERVER", "alfred_workflow_cache", "alfred_workflow_data"):
+        monkeypatch.delenv(var, raising=False)
+    monkeypatch.setenv("HOME", str(tmp_path_factory.mktemp("home")))
     yield

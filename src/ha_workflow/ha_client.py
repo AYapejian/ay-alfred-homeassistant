@@ -20,7 +20,7 @@ class HAClient:
 
     def __init__(self, config: Config, timeout: int = _DEFAULT_TIMEOUT) -> None:
         self._base_url = config.ha_url
-        self._token = config.ha_token
+        self._token = config.get_token()
         self._timeout = timeout
 
     # ------------------------------------------------------------------

@@ -43,6 +43,9 @@ SCHEMA_VERSION = 1
 DEFAULT_PROFILE_ID = "default"
 DEFAULT_PROFILE_NAME = "Default"
 PROFILES_FILENAME = "profiles.json"
+ACTIVE_SERVER_FILENAME = "active_server"
+# Env var naming the server to use for one invocation (beats the pointer file).
+SERVER_ENV_VAR = "HA_SERVER"
 TOKEN_SOURCE_ENV = "env"
 TOKEN_SOURCE_KEYCHAIN = "keychain"
 
@@ -451,3 +454,55 @@ def load_servers(env: Mapping[str, str], data_dir: Path) -> ServerList:
         file_error=file_error,
         file_exists=file_exists,
     )
+
+
+# ---------------------------------------------------------------------------
+# Active server pointer
+# ---------------------------------------------------------------------------
+
+
+def is_valid_server_id(value: str) -> bool:
+    """True for ``default`` or a stored profile id."""
+    return value == DEFAULT_PROFILE_ID or is_valid_profile_id(value)
+
+
+def active_server_path(data_dir: Path) -> Path:
+    return Path(data_dir) / ACTIVE_SERVER_FILENAME
+
+
+def read_active_server(data_dir: Path) -> Optional[str]:
+    """Server id in ``<data_dir>/active_server``, or ``None`` when unset."""
+    try:
+        text = active_server_path(data_dir).read_text(encoding="utf-8")
+    except FileNotFoundError:
+        return None
+    except OSError as exc:
+        raise ConfigError(f"Cannot read the active server file: {exc}") from exc
+    value = text.strip()
+    return value or None
+
+
+def write_active_server(data_dir: Path, server_id: str) -> None:
+    """Atomically point the workflow at *server_id*."""
+    if not is_valid_server_id(server_id):
+        raise ConfigError(f"Invalid server id {server_id!r}")
+    atomic_write_text(active_server_path(data_dir), server_id + "\n")
+
+
+def resolve_server_id(env: Mapping[str, str], data_dir: Path) -> str:
+    """``HA_SERVER`` env > ``active_server`` file > ``default``.
+
+    Only the *shape* of the id is checked here; whether that server exists is
+    the caller's concern.
+    """
+    server_id = env.get(SERVER_ENV_VAR, "").strip()
+    source = SERVER_ENV_VAR
+    if not server_id:
+        server_id = read_active_server(data_dir) or DEFAULT_PROFILE_ID
+        source = ACTIVE_SERVER_FILENAME
+    if not is_valid_server_id(server_id):
+        raise ConfigError(
+            f"Invalid server id {server_id!r} in {source}. "
+            "Use 'ha server:' to choose a server."
+        )
+    return server_id
