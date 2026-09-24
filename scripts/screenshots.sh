@@ -183,9 +183,14 @@ alfred_search() { # query (full Alfred text, e.g. "ha kitchen")
   Q="$1" osascript -e "tell application id \"$ALFRED_ID\" to search (system attribute \"Q\")" >/dev/null
 }
 
-send_keys() { # space-separated tokens: none enter cmd+enter alt+enter ctrl+enter down up tab esc type:<text> wait:<sec>
-  local tok
-  for tok in $1; do
+send_keys() { # ", "-separated tokens: none enter cmd+enter alt+enter ctrl+enter down up tab esc type:<text> wait:<sec>
+  local tok toks=()
+  # Split on ", " only: text after type: may itself contain bare commas.
+  local rest="$1"
+  while [[ -n "$rest" ]]; do
+    if [[ "$rest" == *", "* ]]; then toks+=("${rest%%, *}"); rest="${rest#*, }"; else toks+=("$rest"); rest=""; fi
+  done
+  for tok in "${toks[@]+"${toks[@]}"}"; do
     case "$tok" in
       none | "") ;;
       enter) osascript -e 'tell application "System Events" to key code 36' ;;
@@ -226,7 +231,7 @@ build_gif() {
   local w h
   read -r w h < <(for f in "${frames[@]}"; do sips -g pixelWidth -g pixelHeight "$f" | awk '/pixelWidth/{w=$2}/pixelHeight/{h=$2}END{print w, h}'; done \
     | awk '{if($1>w)w=$1; if($2>h)h=$2} END{print w, h}')
-  ffmpeg -loglevel error -y -framerate 1 -pattern_type glob -i "$OUT_DIR/hero-*.png" \
+  ffmpeg -loglevel error -y -framerate 2 -pattern_type glob -i "$OUT_DIR/hero-*.png" \
     -vf "pad=${w}:${h}:0:0:color=0x00000000,split[a][b];[a]palettegen=reserve_transparent=1[p];[b][p]paletteuse" \
     -loop 0 "$OUT_DIR/hero.gif"
   rm -f "${frames[@]}"
@@ -255,9 +260,46 @@ alfred_workflow_cache="$CACHE_DIR" alfred_workflow_data="$DATA_DIR" \
   /usr/bin/python3 "$REPO_ROOT/src/ha_workflow/cli.py" cache refresh >/dev/null
 
 mkdir -p "$OUT_DIR"
+
+# Setup from SHOTS.md: clear the demo server's usage history, then give Kitchen
+# Lights two uses (toggle twice → original state) so it ranks first.
+run_action() { alfred_search "$1"; sleep "$SETTLE"; send_keys enter; sleep 2; }
+log "setup: resetting demo usage history and seeding Kitchen Lights usage"
+run_action "ha system history"
+run_action "ha kitchen lights"
+run_action "ha kitchen lights"
+
+hero_frame=0
+hero_capture() { # holds
+  local n="${1:-1}" i
+  hero_frame=$((hero_frame + 1))
+  capture "$OUT_DIR/$(printf 'hero-%03d-0.png' "$hero_frame")"
+  for ((i = 1; i < n; i++)); do
+    cp "$OUT_DIR/$(printf 'hero-%03d-0.png' "$hero_frame")" "$OUT_DIR/$(printf 'hero-%03d-%d.png' "$hero_frame" "$i")"
+  done
+}
+hero_type() { alfred_search "$1"; sleep "$SETTLE"; hero_capture "${2:-1}"; }
+
+record_hero() {
+  log "recording hero.gif frames"
+  local q
+  hero_type "ha " 3
+  for q in "ha k" "ha ki" "ha kit" "ha kitc" "ha kitch" "ha kitche"; do hero_type "$q"; done
+  hero_type "ha kitchen" 3
+  for q in "ha kitchen l" "ha kitchen li" "ha kitchen lig" "ha kitchen ligh" "ha kitchen light"; do hero_type "$q"; done
+  hero_type "ha kitchen lights" 3
+  send_keys enter; sleep 2                      # toggle (Alfred closes; not captured)
+  hero_type "ha kitchen lights" 2
+  send_keys cmd+enter; sleep "$SETTLE"
+  hero_capture 6                                # end on the action menu
+  send_keys esc; sleep 0.5
+  run_action "ha kitchen lights"                # toggle back, unrecorded
+}
+
 count=0
 while IFS='|' read -r file query keys _; do
   file="$(trim "$file")"; query="$(trim "$query")"; keys="$(trim "$keys")"
+  [[ "$query" == "<empty>" ]] && query=""
   [[ -z "$ONLY" || "$file" == *"$ONLY"* ]] || continue
   log "shot $file  ←  ha $query  [$keys]"
   alfred_search "ha $query"
@@ -270,5 +312,8 @@ while IFS='|' read -r file query keys _; do
   count=$((count + 1))
 done < <(shot_lines)
 
-build_gif
+if [[ -z "$ONLY" || "hero.gif" == *"$ONLY"* ]]; then
+  record_hero
+  build_gif
+fi
 log "captured $count shot(s) into docs/images/"
